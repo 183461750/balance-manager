@@ -22,16 +22,28 @@
 
 1. 克隆仓库：
 ```bash
-git clone https://github.com/your-username/balance-manager.git
+git clone git@github.com:183461750/balance-manager.git
 cd balance-manager
 ```
 
-2. 安装依赖：
+2. 创建并激活虚拟环境：
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+
+# 在 Linux/macOS 上激活虚拟环境
+source venv/bin/activate
+
+# 在 Windows 上激活虚拟环境
+venv\Scripts\activate
+```
+
+3. 安装依赖：
 ```bash
 pip install -r requirements.txt
 ```
 
-3. 配置环境变量：
+4. 配置环境变量：
 ```bash
 cp .env.example .env
 ```
@@ -60,6 +72,7 @@ PROD_DB_HOST=prod-host
 
 ## 运行
 
+确保虚拟环境已激活，然后运行：
 ```bash
 python app.py
 ```
@@ -78,6 +91,8 @@ python app.py
 - 请谨慎修改生产环境的数据
 - 确保数据库配置正确
 - 注意数据库权限设置
+- 不要将 `.env` 文件提交到版本控制系统
+- 确保在虚拟环境中运行应用
 
 ## 开发说明
 

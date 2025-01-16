@@ -5,6 +5,8 @@ import hashlib
 import os
 from dotenv import load_dotenv
 import logging
+import nacos
+import yaml
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # 用于session加密
@@ -15,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 # 加载环境变量
 load_dotenv()
+
+# Nacos客户端
+nacos_client = None
 
 # 环境配置
 ENVIRONMENTS = {
@@ -50,8 +55,70 @@ ENVIRONMENTS = {
     }
 }
 
+def init_nacos_client(server_addresses, namespace='', username='', password=''):
+    """初始化Nacos客户端"""
+    global nacos_client
+    try:
+        nacos_client = nacos.NacosClient(
+            server_addresses=server_addresses,
+            namespace=namespace,
+            username=username or None,
+            password=password or None
+        )
+        logger.info("Nacos客户端初始化成功")
+        return True
+    except Exception as e:
+        logger.error(f"Nacos客户端初始化失败: {str(e)}")
+        return False
+
+def get_nacos_config():
+    """从Nacos获取配置"""
+    if not nacos_client:
+        logger.error("Nacos客户端未初始化")
+        return None
+    
+    try:
+        # 获取common.yml的内容
+        logger.info("尝试获取Nacos配置: common.yml")
+        content = nacos_client.get_config('common.yml', 'v1.0.0')
+        logger.info(f"获取到的配置内容: {content}")
+        
+        if not content:
+            logger.error("未找到配置内容")
+            return None
+        
+        # 解析YAML内容
+        config = yaml.safe_load(content)
+        logger.info(f"解析后的配置: {config}")
+        
+        # 提取PostgreSQL配置
+        if 'pgsql' in config:
+            pg_config = config['pgsql']
+            return {
+                'host': pg_config.get('address', 'localhost'),
+                'port': int(pg_config.get('port', 5432)),
+                'user': pg_config.get('username', 'postgres'),
+                'password': pg_config.get('password', ''),
+                'dbname': pg_config.get('dbname', 'postgres')
+            }
+        else:
+            logger.error("配置中未找到pgsql部分")
+            return None
+    except Exception as e:
+        logger.error(f"获取Nacos配置失败: {str(e)}")
+        logger.exception(e)  # 打印详细的错误堆栈
+    return None
+
 def get_db_config():
     """获取当前环境的数据库配置"""
+    # 如果使用Nacos配置
+    if session.get('use_nacos', False):
+        nacos_config = get_nacos_config()
+        if nacos_config:
+            return nacos_config
+        logger.warning("无法获取Nacos配置，将使用本地配置")
+    
+    # 使用本地配置
     env = session.get('current_env', 'dev')
     config = ENVIRONMENTS[env]['config']
     # 记录当前使用的配置（不包含密码）
@@ -95,9 +162,11 @@ def calculate_md5(value):
 @app.route('/')
 def index():
     current_env = session.get('current_env', 'dev')
+    use_nacos = session.get('use_nacos', False)
     return render_template('index.html', 
                          environments=ENVIRONMENTS,
-                         current_env=current_env)
+                         current_env=current_env,
+                         use_nacos=use_nacos)
 
 @app.route('/set_environment', methods=['POST'])
 def set_environment():
@@ -197,5 +266,56 @@ def update_balance():
         logger.error(f"更新余额失败: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/set_nacos_config', methods=['POST'])
+def set_nacos_config():
+    try:
+        server_addresses = request.form.get('server_addresses', '')
+        namespace = request.form.get('namespace', '')
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        
+        if not server_addresses:
+            return jsonify({
+                'success': False,
+                'message': 'Nacos服务器地址不能为空'
+            })
+            
+        # 初始化Nacos客户端
+        if init_nacos_client(server_addresses, namespace, username, password):
+            # 测试获取配置
+            config = get_nacos_config()
+            if config:
+                session['use_nacos'] = True
+                return jsonify({
+                    'success': True,
+                    'message': 'Nacos配置成功，已切换到Nacos配置模式',
+                    'config': {k: v if k != 'password' else '******' for k, v in config.items()}
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '无法从Nacos获取PostgreSQL配置，请检查common.yml是否存在且包含正确的配置'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Nacos客户端初始化失败'
+            })
+            
+    except Exception as e:
+        logger.error(f"设置Nacos配置失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'设置Nacos配置时出错: {str(e)}'
+        })
+
+@app.route('/disable_nacos', methods=['POST'])
+def disable_nacos():
+    session['use_nacos'] = False
+    return jsonify({
+        'success': True,
+        'message': '已切换回本地配置模式'
+    })
+
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, host='0.0.0.0', port=3000) 

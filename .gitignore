@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -24,7 +23,7 @@ wheels/
 # Virtual Environment
 venv/
 ENV/
-.env
+env/
 
 # IDE
 .idea/
@@ -32,9 +31,11 @@ ENV/
 *.swp
 *.swo
 
-# Flask
-instance/
-.webassets-cache
+# Environment Variables
+.env
+
+# Nacos
+nacos-data/
 
 # Logs
 *.log

@@ -17,6 +17,7 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         .form-group {
             margin-bottom: 15px;
@@ -49,6 +50,9 @@
         }
         button.secondary {
             background-color: #2196F3;
+        }
+        button.warning {
+            background-color: #ff9800;
         }
         button:hover {
             opacity: 0.9;
@@ -85,11 +89,67 @@
         .environment-prod {
             border-left: 4px solid #dc3545;
         }
+        .config-source {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .nacos-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .nacos-enabled {
+            background-color: #28a745;
+            color: white;
+        }
+        .nacos-disabled {
+            background-color: #dc3545;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>余额修改工具</h1>
+        <h2>Nacos配置</h2>
+        <div class="config-source">
+            当前配置来源: 
+            <span class="nacos-status {% if use_nacos %}nacos-enabled{% else %}nacos-disabled{% endif %}">
+                {% if use_nacos %}使用Nacos配置{% else %}使用本地配置{% endif %}
+            </span>
+        </div>
+        <form id="nacosForm">
+            <div class="form-group">
+                <label for="server_addresses">Nacos服务器地址:</label>
+                <input type="text" id="server_addresses" name="server_addresses" placeholder="例如: http://localhost:8848">
+            </div>
+            <div class="form-group">
+                <label for="namespace">命名空间:</label>
+                <input type="text" id="namespace" name="namespace" placeholder="可选">
+            </div>
+            <div class="form-group">
+                <label for="username">用户名:</label>
+                <input type="text" id="username" name="username" placeholder="可选">
+            </div>
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" name="password" placeholder="可选">
+            </div>
+            <div class="button-group">
+                {% if use_nacos %}
+                <button type="button" class="warning" onclick="disableNacos()">禁用Nacos</button>
+                {% else %}
+                <button type="submit">启用Nacos</button>
+                {% endif %}
+            </div>
+        </form>
+        <div id="nacosResult" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>余额修改工具</h2>
         
         <div class="environment-indicator environment-{{ current_env }}">
             <div class="form-group">
@@ -122,6 +182,94 @@
     </div>
 
     <script>
+        // 保存表单数据到localStorage
+        function saveFormData() {
+            const formData = {
+                server_addresses: document.getElementById('server_addresses').value,
+                namespace: document.getElementById('namespace').value,
+                username: document.getElementById('username').value,
+                // 出于安全考虑，不保存密码
+            };
+            localStorage.setItem('nacosFormData', JSON.stringify(formData));
+        }
+
+        // 从localStorage恢复表单数据
+        function loadFormData() {
+            const savedData = localStorage.getItem('nacosFormData');
+            if (savedData) {
+                const formData = JSON.parse(savedData);
+                document.getElementById('server_addresses').value = formData.server_addresses || '';
+                document.getElementById('namespace').value = formData.namespace || '';
+                document.getElementById('username').value = formData.username || '';
+            }
+        }
+
+        // 页面加载时恢复表单数据
+        document.addEventListener('DOMContentLoaded', loadFormData);
+
+        // Nacos表单提交处理
+        document.getElementById('nacosForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const resultDiv = document.getElementById('nacosResult');
+            
+            try {
+                // 保存表单数据
+                saveFormData();
+
+                const response = await fetch('/set_nacos_config', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                resultDiv.style.display = 'block';
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <h3>Nacos配置成功</h3>
+                        <p>${data.message}</p>
+                        <p>PostgreSQL配置:</p>
+                        <pre>${JSON.stringify(data.config, null, 2)}</pre>
+                    `;
+                    // 刷新页面以更新状态
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<p>错误: ${data.message}</p>`;
+                }
+            } catch (error) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<p>系统错误: ${error.message}</p>`;
+            }
+        });
+
+        // 禁用Nacos
+        async function disableNacos() {
+            const resultDiv = document.getElementById('nacosResult');
+            
+            try {
+                const response = await fetch('/disable_nacos', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 刷新页面以更新状态
+                    location.reload();
+                } else {
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<p>错误: ${data.message}</p>`;
+                }
+            } catch (error) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<p>系统错误: ${error.message}</p>`;
+            }
+        }
+
         // 环境切换处理
         document.getElementById('environment').addEventListener('change', async (e) => {
             const formData = new FormData();
@@ -196,7 +344,7 @@
             }
         }
 
-        // 表单提交处理
+        // 余额修改表单提交处理
         document.getElementById('balanceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);

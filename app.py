@@ -111,8 +111,9 @@ def get_nacos_config():
 
 def get_db_config():
     """获取当前环境的数据库配置"""
-    # 如果使用Nacos配置
-    if session.get('use_nacos', False):
+    config_type = session.get('config_type', 'nacos')  # 默认使用nacos配置
+    
+    if config_type == 'nacos':
         nacos_config = get_nacos_config()
         if nacos_config:
             return nacos_config
@@ -161,18 +162,19 @@ def calculate_md5(value):
 
 @app.route('/')
 def index():
+    config_type = session.get('config_type', 'nacos')
     current_env = session.get('current_env', 'dev')
-    use_nacos = session.get('use_nacos', False)
     return render_template('index.html', 
                          environments=ENVIRONMENTS,
                          current_env=current_env,
-                         use_nacos=use_nacos)
+                         config_type=config_type)
 
 @app.route('/set_environment', methods=['POST'])
 def set_environment():
     env = request.form.get('environment')
     if env in ENVIRONMENTS:
         session['current_env'] = env
+        session['config_type'] = 'env'
         return jsonify({
             'success': True,
             'message': f'已切换到{ENVIRONMENTS[env]["name"]}',
@@ -285,7 +287,7 @@ def set_nacos_config():
             # 测试获取配置
             config = get_nacos_config()
             if config:
-                session['use_nacos'] = True
+                session['config_type'] = 'nacos'
                 return jsonify({
                     'success': True,
                     'message': 'Nacos配置成功，已切换到Nacos配置模式',

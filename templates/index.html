@@ -120,63 +120,130 @@
         .hidden {
             display: none;
         }
+        .config-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+        .config-summary.nacos {
+            border-left: 4px solid #673ab7;
+        }
+        .config-summary.env {
+            border-left: 4px solid #2196F3;
+        }
+        .config-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .config-info .label {
+            font-weight: bold;
+            color: #666;
+        }
+        .config-info .value {
+            color: #333;
+        }
+        .toggle-config {
+            background-color: #673ab7;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .toggle-config:hover {
+            opacity: 0.9;
+        }
+        .config-details {
+            margin-top: 15px;
+        }
+        .collapse {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .expand {
+            max-height: 1000px;
+            transition: max-height 0.3s ease-in;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="config-header">
-            <h2>数据库配置</h2>
-            <div class="config-type">
-                <select id="configType" disabled>
-                    <option value="nacos">Nacos配置</option>
-                    <option value="env">环境变量配置</option>
-                </select>
-                <button class="config-switch" onclick="toggleConfigType()">切换配置方式</button>
+        <h2>数据库配置</h2>
+        
+        <!-- 配置状态摘要 -->
+        <div id="configSummary" class="config-summary nacos">
+            <div class="config-info">
+                <span class="label">配置方式:</span>
+                <span class="value" id="currentConfigType">Nacos配置</span>
+                <span class="label">当前配置:</span>
+                <span class="value" id="currentConfigValue">未连接</span>
             </div>
+            <button class="toggle-config" onclick="toggleConfigPanel()">展开配置</button>
         </div>
 
-        <!-- Nacos配置部分 -->
-        <div id="nacosConfig">
-            <form id="nacosForm">
-                <div class="form-group">
-                    <label for="server_addresses">Nacos服务器地址:</label>
-                    <input type="text" id="server_addresses" name="server_addresses" placeholder="例如: http://localhost:8848">
-                </div>
-                <div class="form-group">
-                    <label for="namespace">命名空间:</label>
-                    <input type="text" id="namespace" name="namespace" placeholder="可选">
-                </div>
-                <div class="form-group">
-                    <label for="username">用户名:</label>
-                    <input type="text" id="username" name="username" placeholder="可选">
-                </div>
-                <div class="form-group">
-                    <label for="password">密码:</label>
-                    <input type="password" id="password" name="password" placeholder="可选">
-                </div>
-                <div class="button-group">
-                    <button type="submit">连接Nacos</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- 环境变量配置部分 -->
-        <div id="envConfig" class="hidden">
-            <div class="environment-indicator environment-{{ current_env }}">
-                <div class="form-group">
-                    <label for="environment">选择环境:</label>
-                    <select id="environment" name="environment">
-                        {% for env_key, env in environments.items() %}
-                        <option value="{{ env_key }}" {% if env_key == current_env %}selected{% endif %}>
-                            {{ env.name }}
-                        </option>
-                        {% endfor %}
+        <!-- 配置详情面板 -->
+        <div id="configDetails" class="config-details collapse">
+            <div class="config-header">
+                <div class="config-type">
+                    <select id="configType" disabled>
+                        <option value="nacos">Nacos配置</option>
+                        <option value="env">环境变量配置</option>
                     </select>
+                    <button class="config-switch" onclick="toggleConfigType()">切换配置方式</button>
                 </div>
             </div>
-        </div>
 
-        <div id="configResult" class="result"></div>
+            <!-- Nacos配置部分 -->
+            <div id="nacosConfig">
+                <form id="nacosForm">
+                    <div class="form-group">
+                        <label for="server_addresses">Nacos服务器地址:</label>
+                        <input type="text" id="server_addresses" name="server_addresses" placeholder="例如: http://localhost:8848">
+                    </div>
+                    <div class="form-group">
+                        <label for="namespace">命名空间:</label>
+                        <input type="text" id="namespace" name="namespace" placeholder="可选">
+                    </div>
+                    <div class="form-group">
+                        <label for="username">用户名:</label>
+                        <input type="text" id="username" name="username" placeholder="可选">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密码:</label>
+                        <input type="password" id="password" name="password" placeholder="可选">
+                    </div>
+                    <div class="button-group">
+                        <button type="submit">连接Nacos</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 环境变量配置部分 -->
+            <div id="envConfig" class="hidden">
+                <div class="environment-indicator environment-{{ current_env }}">
+                    <div class="form-group">
+                        <label for="environment">选择环境:</label>
+                        <select id="environment" name="environment">
+                            {% for env_key, env in environments.items() %}
+                            <option value="{{ env_key }}" {% if env_key == current_env %}selected{% endif %}>
+                                {{ env.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="configResult" class="result"></div>
+        </div>
     </div>
 
     <div class="container">
@@ -205,7 +272,8 @@
                 server_addresses: document.getElementById('server_addresses').value,
                 namespace: document.getElementById('namespace').value,
                 username: document.getElementById('username').value,
-                configType: document.getElementById('configType').value
+                configType: document.getElementById('configType').value,
+                isExpanded: document.getElementById('configDetails').classList.contains('expand')
             };
             localStorage.setItem('nacosFormData', JSON.stringify(formData));
         }
@@ -222,7 +290,41 @@
                     document.getElementById('configType').value = formData.configType;
                     updateConfigDisplay(formData.configType);
                 }
+                // 恢复折叠状态
+                if (formData.isExpanded) {
+                    toggleConfigPanel(true);
+                }
             }
+        }
+
+        // 切换配置面板显示状态
+        function toggleConfigPanel(forceExpand) {
+            const configDetails = document.getElementById('configDetails');
+            const toggleButton = document.querySelector('.toggle-config');
+            const isExpanded = configDetails.classList.contains('expand');
+            
+            if (forceExpand === true || !isExpanded) {
+                configDetails.classList.remove('collapse');
+                configDetails.classList.add('expand');
+                toggleButton.textContent = '收起配置';
+            } else {
+                configDetails.classList.remove('expand');
+                configDetails.classList.add('collapse');
+                toggleButton.textContent = '展开配置';
+            }
+            saveFormData();
+        }
+
+        // 更新配置摘要信息
+        function updateConfigSummary(configType, configValue) {
+            const summary = document.getElementById('configSummary');
+            const typeSpan = document.getElementById('currentConfigType');
+            const valueSpan = document.getElementById('currentConfigValue');
+            
+            typeSpan.textContent = configType === 'nacos' ? 'Nacos配置' : '环境变量配置';
+            valueSpan.textContent = configValue || '未连接';
+            
+            summary.className = `config-summary ${configType}`;
         }
 
         // 切换配置方式
@@ -274,9 +376,7 @@
             const resultDiv = document.getElementById('configResult');
             
             try {
-                // 保存表单数据
                 saveFormData();
-
                 const response = await fetch('/set_nacos_config', {
                     method: 'POST',
                     body: formData
@@ -292,6 +392,12 @@
                         <p>PostgreSQL配置:</p>
                         <pre>${JSON.stringify(data.config, null, 2)}</pre>
                     `;
+                    // 更新摘要信息并自动折叠
+                    updateConfigSummary('nacos', formData.get('server_addresses'));
+                    setTimeout(() => {
+                        toggleConfigPanel(false);
+                        resultDiv.style.display = 'none';
+                    }, 2000);
                 } else {
                     resultDiv.className = 'result error';
                     resultDiv.innerHTML = `<p>错误: ${data.message}</p>`;
@@ -316,20 +422,22 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // 更新环境指示器样式
                     const indicator = document.querySelector('.environment-indicator');
                     indicator.className = `environment-indicator environment-${data.environment}`;
                     
-                    // 显示成功消息
                     const resultDiv = document.getElementById('configResult');
                     resultDiv.style.display = 'block';
                     resultDiv.className = 'result success';
                     resultDiv.innerHTML = `<p>${data.message}</p>`;
                     
-                    // 3秒后隐藏消息
+                    // 更新摘要信息并自动折叠
+                    const envSelect = document.getElementById('environment');
+                    const selectedEnv = envSelect.options[envSelect.selectedIndex].text;
+                    updateConfigSummary('env', selectedEnv);
                     setTimeout(() => {
+                        toggleConfigPanel(false);
                         resultDiv.style.display = 'none';
-                    }, 3000);
+                    }, 2000);
                 }
             } catch (error) {
                 console.error('切换环境失败:', error);
@@ -407,6 +515,21 @@
                 resultDiv.style.display = 'block';
                 resultDiv.className = 'result error';
                 resultDiv.innerHTML = `<p>系统错误: ${error.message}</p>`;
+            }
+        });
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFormData();
+            // 根据当前配置更新摘要信息
+            const configType = document.getElementById('configType').value;
+            if (configType === 'nacos') {
+                const serverAddress = document.getElementById('server_addresses').value;
+                updateConfigSummary('nacos', serverAddress || '未连接');
+            } else {
+                const envSelect = document.getElementById('environment');
+                const selectedEnv = envSelect.options[envSelect.selectedIndex].text;
+                updateConfigSummary('env', selectedEnv);
             }
         });
     </script>

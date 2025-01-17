@@ -467,9 +467,19 @@
                 resultDiv.style.display = 'block';
                 if (data.success) {
                     resultDiv.className = 'result success';
+                    // 根据配置方式显示不同的信息
+                    const configType = document.getElementById('configType').value;
+                    let configInfo = '';
+                    if (configType === 'nacos') {
+                        const serverAddress = document.getElementById('server_addresses').value;
+                        configInfo = `<p>配置方式: Nacos配置 (${serverAddress})</p>`;
+                    } else {
+                        configInfo = `<p>环境: ${data.data.environment}</p>`;
+                    }
+                    
                     resultDiv.innerHTML = `
                         <h3>当前余额信息</h3>
-                        <p>环境: ${data.data.environment}</p>
+                        ${configInfo}
                         <p>余额: ${data.data.balance}</p>
                         <p>加密值: ${data.data.encrypt}</p>
                     `;
@@ -502,9 +512,19 @@
                 resultDiv.style.display = 'block';
                 if (data.success) {
                     resultDiv.className = 'result success';
+                    // 根据配置方式显示不同的信息
+                    const configType = document.getElementById('configType').value;
+                    let configInfo = '';
+                    if (configType === 'nacos') {
+                        const serverAddress = document.getElementById('server_addresses').value;
+                        configInfo = `<p>配置方式: Nacos配置 (${serverAddress})</p>`;
+                    } else {
+                        configInfo = `<p>环境: ${data.data.environment}</p>`;
+                    }
+                    
                     resultDiv.innerHTML = `
                         <h3>修改成功</h3>
-                        <p>环境: ${data.data.environment}</p>
+                        ${configInfo}
                         <p>新余额: ${data.data.balance}</p>
                         <p>加密值: ${data.data.encrypt}</p>
                     `;

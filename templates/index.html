@@ -100,6 +100,16 @@
         }
         .config-type select {
             width: auto;
+            padding-right: 30px;
+        }
+        .config-type .edit-icon {
+            cursor: pointer;
+            color: #673ab7;
+            font-size: 1.2em;
+            padding: 5px;
+        }
+        .config-type .edit-icon:hover {
+            opacity: 0.8;
         }
         .environment-indicator {
             background-color: #f8f9fa;
@@ -193,11 +203,11 @@
         <div id="configDetails" class="config-details collapse">
             <div class="config-header">
                 <div class="config-type">
-                    <select id="configType" disabled>
+                    <select id="configType" onchange="handleConfigTypeChange(this)">
                         <option value="nacos">Nacos配置</option>
                         <option value="env">环境变量配置</option>
                     </select>
-                    <button class="config-switch" onclick="toggleConfigType()">切换配置方式</button>
+                    <span class="edit-icon" onclick="enableConfigTypeEdit()" title="修改配置方式">✎</span>
                 </div>
             </div>
 
@@ -287,7 +297,9 @@
                 document.getElementById('namespace').value = formData.namespace || '';
                 document.getElementById('username').value = formData.username || '';
                 if (formData.configType) {
-                    document.getElementById('configType').value = formData.configType;
+                    const configTypeSelect = document.getElementById('configType');
+                    configTypeSelect.value = formData.configType;
+                    configTypeSelect.disabled = true;
                     updateConfigDisplay(formData.configType);
                 }
                 // 恢复折叠状态
@@ -327,22 +339,18 @@
             summary.className = `config-summary ${configType}`;
         }
 
-        // 切换配置方式
-        function toggleConfigType() {
+        // 处理配置类型变化
+        function handleConfigTypeChange(select) {
+            updateConfigDisplay(select.value);
+            select.disabled = true;
+            saveFormData();
+        }
+
+        // 启用配置类型编辑
+        function enableConfigTypeEdit() {
             const select = document.getElementById('configType');
-            const isDisabled = select.disabled;
-            
-            if (isDisabled) {
-                // 启用选择
-                select.disabled = false;
-                document.querySelector('.config-switch').textContent = '确认选择';
-            } else {
-                // 确认选择
-                select.disabled = true;
-                document.querySelector('.config-switch').textContent = '切换配置方式';
-                updateConfigDisplay(select.value);
-                saveFormData();
-            }
+            select.disabled = false;
+            select.focus();
         }
 
         // 更新配置显示
@@ -361,13 +369,6 @@
 
         // 页面加载时恢复表单数据
         document.addEventListener('DOMContentLoaded', loadFormData);
-
-        // 配置类型改变时的处理
-        document.getElementById('configType').addEventListener('change', function() {
-            if (!this.disabled) {
-                updateConfigDisplay(this.value);
-            }
-        });
 
         // Nacos表单提交处理
         document.getElementById('nacosForm').addEventListener('submit', async (e) => {

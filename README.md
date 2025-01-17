@@ -1,139 +1,63 @@
-# 用户余额管理工具
+# Balance Manager
 
-一个简单的Web工具，用于管理用户账户余额。支持多环境配置，可以查询和修改用户余额。支持从Nacos配置中心读取数据库配置。
+余额管理工具，支持通过Nacos配置或环境变量方式连接数据库，提供余额查询和修改功能。
 
-## 功能特点
+## 功能特性
 
-- 多环境支持（开发、测试、生产）
-- 通过手机号查询用户余额
-- 修改用户余额
-- 自动计算余额的MD5加密值
-- 实时环境切换
-- 友好的错误提示
-- 支持从Nacos配置中心读取配置
+- 支持Nacos配置中心
+- 支持环境变量配置
+- 余额查询和修改
+- 配置状态可视化
+- Docker容器化部署
 
-## 技术栈
+## 部署方式
 
-- Python 3.x
-- Flask
-- PostgreSQL
-- Nacos配置中心
-- HTML/CSS/JavaScript
+### Docker Compose部署（推荐）
 
-## 安装
+1. 确保已安装Docker和Docker Compose
+2. 克隆项目到本地
+3. 在项目根目录执行：
 
-1. 克隆仓库：
 ```bash
-git clone git@github.com:183461750/balance-manager.git
-cd balance-manager
+# 构建并启动服务
+docker compose up -d
+
+# 查看服务日志
+docker compose logs -f
+
+# 停止服务
+docker compose down
 ```
 
-2. 创建并激活虚拟环境：
-```bash
-# 创建虚拟环境
-python3 -m venv venv
+### 本地开发部署
 
-# 在 Linux/macOS 上激活虚拟环境
-source venv/bin/activate
-
-# 在 Windows 上激活虚拟环境
-venv\Scripts\activate
-```
-
-3. 安装依赖：
+1. 安装Python 3.9+
+2. 安装依赖：
 ```bash
 pip install -r requirements.txt
 ```
-
-4. 配置环境变量：
-```bash
-cp .env.example .env
-```
-然后编辑 `.env` 文件，填入正确的数据库配置。
-
-## 配置说明
-
-### 本地配置
-在 `.env` 文件中配置各环境的数据库连接信息：
-
-```ini
-# 开发环境配置
-DEV_DB_HOST=localhost
-DEV_DB_USER=postgres
-DEV_DB_PASSWORD=your_password
-DEV_DB_NAME=your_database
-DEV_DB_PORT=5432
-
-# 测试环境配置
-TEST_DB_HOST=test-host
-...
-
-# 生产环境配置
-PROD_DB_HOST=prod-host
-...
-```
-
-### Nacos配置
-支持从Nacos配置中心读取PostgreSQL配置。在Nacos中，配置应该存储在以下位置：
-- 数据ID：common.yml
-- 组：server
-- 格式：YAML
-
-配置示例：
-```yaml
-pgsql:
-  address: localhost
-  port: 5432
-  username: dbadmin
-  password: dbadmin
-  dbname: v3-test
-```
-
-## 运行
-
-确保虚拟环境已激活，然后运行：
+3. 启动应用：
 ```bash
 python app.py
 ```
 
-访问 http://localhost:5000 即可使用。
+## 配置说明
 
-## 使用说明
+### Nacos配置方式
+- 支持配置Nacos服务器地址
+- 可选配置命名空间
+- 支持用户认证
 
-1. 配置来源选择
-   - 可以选择使用本地配置或Nacos配置
-   - 使用Nacos配置时，需要填写Nacos服务器地址等信息
+### 环境变量配置
+- 支持开发、测试、生产环境切换
+- 使用环境变量设置数据库连接信息
 
-2. 环境选择（使用本地配置时）
-   - 选择环境（开发/测试/生产）
+## 访问地址
 
-3. 余额操作
-   - 输入用户手机号
-   - 点击"查询余额"可以查看当前余额
-   - 输入新的余额金额，点击"修改余额"进行更新
+- Web界面：http://localhost:3000
 
 ## 注意事项
 
-- 请谨慎修改生产环境的数据
-- 确保数据库配置正确
-- 注意数据库权限设置
-- 不要将 `.env` 文件提交到版本控制系统
-- 确保在虚拟环境中运行应用
-- 使用Nacos配置时，确保Nacos服务可用且配置正确
-
-## 开发说明
-
-- 使用 Flask 框架开发
-- 使用 PostgreSQL 数据库
-- 支持Nacos配置中心
-- 前端使用原生 JavaScript，无需其他依赖
-- 支持实时环境切换
-- 包含详细的错误处理和日志记录
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request。
-
-## 许可证
-
-MIT License 
+1. 生产环境部署时请修改docker-compose.yml中的环境变量
+2. 建议使用Nacos配置方式以便统一管理
+3. 容器化部署时数据持久化已通过volumes配置 

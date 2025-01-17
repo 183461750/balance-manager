@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  balance-manager:
+    build: .
+    container_name: balance-manager
+    ports:
+      - "3000:3000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+    volumes:
+      - .:/app
+    networks:
+      - balance-network
+    restart: unless-stopped
+
+networks:
+  balance-network:
+    driver: bridge 

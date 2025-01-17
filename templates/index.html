@@ -250,6 +250,61 @@
     </div>
 
     <script>
+        // 配置状态管理
+        const ConfigManager = {
+            // 保存配置到localStorage
+            saveConfig: function(type, data) {
+                const config = {
+                    type: type,
+                    data: data,
+                    timestamp: new Date().getTime()
+                };
+                localStorage.setItem('dbConfig', JSON.stringify(config));
+                this.updateUI(config);
+            },
+
+            // 从localStorage加载配置
+            loadConfig: function() {
+                const saved = localStorage.getItem('dbConfig');
+                if (saved) {
+                    try {
+                        const config = JSON.parse(saved);
+                        this.updateUI(config);
+                        return config;
+                    } catch (e) {
+                        console.error('加载配置失败:', e);
+                    }
+                }
+                return null;
+            },
+
+            // 更新UI显示
+            updateUI: function(config) {
+                if (!config) return;
+
+                const badge = document.getElementById('configBadge');
+                const status = document.getElementById('configStatus');
+                
+                badge.className = 'config-badge ' + config.type;
+                if (config.type === 'nacos') {
+                    status.textContent = 'Nacos: ' + (config.data.server || '未连接');
+                    // 恢复Nacos表单数据
+                    if (config.data.server) {
+                        document.getElementById('server_addresses').value = config.data.server;
+                        document.getElementById('namespace').value = config.data.namespace || '';
+                        document.getElementById('username').value = config.data.username || '';
+                    }
+                } else {
+                    status.textContent = '环境: ' + config.data.envName;
+                    // 恢复环境选择
+                    const envSelect = document.getElementById('environment');
+                    if (envSelect) {
+                        envSelect.value = config.data.envKey;
+                    }
+                }
+            }
+        };
+
         // 打开配置模态框
         function openConfigModal() {
             document.getElementById('configModal').style.display = 'block';
@@ -271,19 +326,6 @@
             
             event.target.classList.add('active');
             document.getElementById(tabName + 'Tab').classList.add('active');
-        }
-
-        // 更新配置状态标签
-        function updateConfigBadge(type, value) {
-            const badge = document.getElementById('configBadge');
-            const status = document.getElementById('configStatus');
-            
-            badge.className = 'config-badge ' + type;
-            if (type === 'nacos') {
-                status.textContent = 'Nacos: ' + (value || '未连接');
-            } else {
-                status.textContent = '环境: ' + value;
-            }
         }
 
         // 查询余额
@@ -308,11 +350,10 @@
                 resultDiv.style.display = 'block';
                 if (data.success) {
                     resultDiv.className = 'result success fade-enter';
-                    const configType = document.getElementById('configType')?.value || 'nacos';
+                    const config = ConfigManager.loadConfig();
                     let configInfo = '';
-                    if (configType === 'nacos') {
-                        const serverAddress = document.getElementById('server_addresses')?.value;
-                        configInfo = `<p>配置方式: Nacos配置 (${serverAddress})</p>`;
+                    if (config.type === 'nacos') {
+                        configInfo = `<p>配置方式: Nacos配置 (${config.data.server})</p>`;
                     } else {
                         configInfo = `<p>环境: ${data.data.environment}</p>`;
                     }
@@ -347,7 +388,12 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    updateConfigBadge('nacos', formData.get('server_addresses'));
+                    // 保存Nacos配置
+                    ConfigManager.saveConfig('nacos', {
+                        server: formData.get('server_addresses'),
+                        namespace: formData.get('namespace'),
+                        username: formData.get('username')
+                    });
                     closeConfigModal();
                     alert('Nacos配置成功');
                 } else {
@@ -373,7 +419,11 @@
                 if (data.success) {
                     const envSelect = document.getElementById('environment');
                     const selectedEnv = envSelect.options[envSelect.selectedIndex].text;
-                    updateConfigBadge('env', selectedEnv);
+                    // 保存环境配置
+                    ConfigManager.saveConfig('env', {
+                        envKey: e.target.value,
+                        envName: selectedEnv
+                    });
                     closeConfigModal();
                     alert('环境切换成功');
                 }
@@ -398,11 +448,10 @@
                 resultDiv.style.display = 'block';
                 if (data.success) {
                     resultDiv.className = 'result success fade-enter';
-                    const configType = document.getElementById('configType')?.value || 'nacos';
+                    const config = ConfigManager.loadConfig();
                     let configInfo = '';
-                    if (configType === 'nacos') {
-                        const serverAddress = document.getElementById('server_addresses')?.value;
-                        configInfo = `<p>配置方式: Nacos配置 (${serverAddress})</p>`;
+                    if (config.type === 'nacos') {
+                        configInfo = `<p>配置方式: Nacos配置 (${config.data.server})</p>`;
                     } else {
                         configInfo = `<p>环境: ${data.data.environment}</p>`;
                     }
@@ -425,14 +474,11 @@
 
         // 页面加载时初始化配置状态
         document.addEventListener('DOMContentLoaded', () => {
-            const configType = document.getElementById('configType')?.value || 'nacos';
-            if (configType === 'nacos') {
-                const serverAddress = document.getElementById('server_addresses')?.value;
-                updateConfigBadge('nacos', serverAddress || '未连接');
-            } else {
-                const envSelect = document.getElementById('environment');
-                const selectedEnv = envSelect.options[envSelect.selectedIndex].text;
-                updateConfigBadge('env', selectedEnv);
+            // 加载保存的配置
+            const config = ConfigManager.loadConfig();
+            if (!config) {
+                // 如果没有保存的配置，设置默认状态
+                ConfigManager.saveConfig('nacos', { server: '未连接' });
             }
         });
 

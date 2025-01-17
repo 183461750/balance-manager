@@ -481,7 +481,6 @@
                         <h3>当前余额信息</h3>
                         ${configInfo}
                         <p>余额: ${data.data.balance}</p>
-                        <p>加密值: ${data.data.encrypt}</p>
                     `;
                     // 自动填充余额输入框
                     document.getElementById('balance').value = data.data.balance;
@@ -526,7 +525,6 @@
                         <h3>修改成功</h3>
                         ${configInfo}
                         <p>新余额: ${data.data.balance}</p>
-                        <p>加密值: ${data.data.encrypt}</p>
                     `;
                 } else {
                     resultDiv.className = 'result error';

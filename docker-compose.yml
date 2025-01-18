@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   balance-manager:
-    build: .
+    image: balance-manager:latest
     container_name: balance-manager
     ports:
       - "3000:3000"

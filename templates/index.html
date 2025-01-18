@@ -112,6 +112,7 @@
             background-color: #f8f9fa;
             border: 1px solid #ddd;
             z-index: 1;
+            white-space: nowrap;
         }
         .config-badge.nacos {
             background-color: #e3f2fd;
@@ -137,6 +138,7 @@
             position: relative;
             overflow: hidden;
             min-height: 40px;
+            padding-right: 200px;
         }
         .domain-bar i {
             font-size: 1.1em;
@@ -150,7 +152,8 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 400px;
+            max-width: none;
+            flex: 1;
             cursor: help;
             position: relative;
             padding: 2px 4px;

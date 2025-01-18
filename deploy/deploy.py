@@ -18,8 +18,9 @@ logger = logging.getLogger(__name__)
 class Deployer:
     def __init__(self, config_path='config.yaml'):
         self.config = self._load_config(config_path)
-        self.total_steps = 10  # 总步骤数
+        self.total_steps = 8  # 减少步骤，因为不再需要传输和加载镜像
         self.current_step = 0
+        self.image_name = "registry.cn-hangzhou.aliyuncs.com/iuin/balance-manager:latest"
 
     def _load_config(self, config_path):
         """加载配置文件"""
@@ -142,19 +143,11 @@ class Deployer:
             self._run_command(tar_cmd, "代码同步进度")
             logger.info("代码同步完成")
 
-            self._update_progress("准备传输Docker镜像")
-            # 传输Docker镜像
-            image_path = f"{project_root}/balance-manager.tar"
-            image_size = os.path.getsize(image_path)
-            scp_cmd = f"pv -s {image_size} {image_path} | ssh {self.config['ssh']['host']} 'cat > {self.config['ssh']['project_path']}/balance-manager.tar'"
-            self._run_command(scp_cmd, "Docker镜像传输进度")
-            logger.info("Docker镜像传输完成")
-
-            self._update_progress("加载Docker镜像")
-            # 加载Docker镜像
-            load_cmd = f"ssh {self.config['ssh']['host']} 'cd {self.config['ssh']['project_path']} && docker load < balance-manager.tar'"
-            self._run_command(load_cmd)
-            logger.info("Docker镜像加载完成")
+            self._update_progress("拉取Docker镜像")
+            # 拉取阿里云镜像
+            pull_cmd = f"ssh {self.config['ssh']['host']} 'docker pull {self.image_name}'"
+            self._run_command(pull_cmd)
+            logger.info("Docker镜像拉取完成")
 
             self._update_progress("执行部署命令")
             # 执行配置的命令

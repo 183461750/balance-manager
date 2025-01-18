@@ -1,8 +1,8 @@
-version: '3.8'
+version: '3'
 
 services:
   balance-manager:
-    image: balance-manager:latest
+    image: registry.cn-hangzhou.aliyuncs.com/iuin/balance-manager:latest
     container_name: balance-manager
     ports:
       - "3000:3000"
@@ -13,7 +13,7 @@ services:
       - .:/app
     networks:
       - balance-network
-    restart: unless-stopped
+    restart: always
 
 networks:
   balance-network:

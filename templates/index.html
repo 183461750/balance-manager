@@ -88,7 +88,7 @@
         }
         .btn-settings {
             position: absolute;
-            top: 20px;
+            top: 65px;
             right: 20px;
             background: none;
             border: none;
@@ -97,19 +97,21 @@
             cursor: pointer;
             padding: 5px;
             transition: color 0.3s;
+            z-index: 1;
         }
         .btn-settings:hover {
             color: #333;
         }
         .config-badge {
             position: absolute;
-            top: 20px;
+            top: 70px;
             right: 60px;
             padding: 5px 10px;
             border-radius: 15px;
             font-size: 0.8em;
             background-color: #f8f9fa;
             border: 1px solid #ddd;
+            z-index: 1;
         }
         .config-badge.nacos {
             background-color: #e3f2fd;
@@ -134,6 +136,7 @@
             border-radius: 8px 8px 0 0;
             position: relative;
             overflow: hidden;
+            min-height: 40px;
         }
         .domain-bar i {
             font-size: 1.1em;

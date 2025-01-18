@@ -103,10 +103,30 @@
             gap: 8px;
             margin: -20px -20px 20px -20px;
             border-radius: 8px 8px 0 0;
+            position: relative;
+            overflow: hidden;
         }
         .domain-bar i {
             font-size: 1.1em;
             color: #0d6efd;
+            flex-shrink: 0;
+        }
+        .domain-bar span {
+            flex-shrink: 0;
+        }
+        .domain-bar strong {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 400px;
+            cursor: help;
+            position: relative;
+            padding: 2px 4px;
+            transition: all 0.3s ease;
+        }
+        .domain-bar strong:hover {
+            background-color: #e9ecef;
+            border-radius: 4px;
         }
         .domain-bar .separator {
             color: #dee2e6;
@@ -184,6 +204,38 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        /* 添加工具提示样式 */
+        .tooltip {
+            position: absolute;
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 5px;
+        }
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        .domain-bar strong:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
     </style>
 </head>
 <body>
@@ -192,7 +244,10 @@
         <div class="domain-bar">
             <i class="bi bi-globe"></i>
             <span>当前域名:</span>
-            <strong id="currentDomain">未连接</strong>
+            <strong id="currentDomain" title="">
+                未连接
+                <span class="tooltip"></span>
+            </strong>
         </div>
 
         <h2>余额修改工具</h2>
@@ -537,14 +592,31 @@
                 .then(data => {
                     const domainElement = document.getElementById('currentDomain');
                     if (data.success) {
-                        domainElement.textContent = data.gateway_url;
+                        const url = data.gateway_url;
+                        domainElement.textContent = url;
+                        domainElement.title = url;  // 设置原生title属性作为备用
+                        const tooltip = domainElement.querySelector('.tooltip');
+                        if (tooltip) {
+                            tooltip.textContent = url;
+                        }
                     } else {
                         domainElement.textContent = '未配置';
+                        domainElement.title = '';
+                        const tooltip = domainElement.querySelector('.tooltip');
+                        if (tooltip) {
+                            tooltip.textContent = '';
+                        }
                     }
                 })
                 .catch(error => {
                     console.error('获取网关地址失败:', error);
-                    document.getElementById('currentDomain').textContent = '连接失败';
+                    const domainElement = document.getElementById('currentDomain');
+                    domainElement.textContent = '连接失败';
+                    domainElement.title = '';
+                    const tooltip = domainElement.querySelector('.tooltip');
+                    if (tooltip) {
+                        tooltip.textContent = '';
+                    }
                 });
         }
 

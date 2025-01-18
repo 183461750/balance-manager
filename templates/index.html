@@ -92,6 +92,26 @@
             border-color: #a5d6a7;
             color: #388e3c;
         }
+        .domain-bar {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            padding: 8px 20px;
+            font-size: 0.9em;
+            color: #6c757d;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+        }
+        .domain-bar i {
+            font-size: 1.1em;
+            color: #0d6efd;
+        }
+        .domain-bar .separator {
+            color: #dee2e6;
+            margin: 0 5px;
+        }
         .result {
             margin-top: 20px;
             padding: 15px;
@@ -168,6 +188,13 @@
 </head>
 <body>
     <div class="container">
+        <!-- 添加域名状态栏 -->
+        <div class="domain-bar">
+            <i class="bi bi-globe"></i>
+            <span>当前域名:</span>
+            <strong id="currentDomain">未连接</strong>
+        </div>
+
         <h2>余额修改工具</h2>
         
         <!-- 配置状态标签 -->
@@ -284,10 +311,22 @@
 
                 const badge = document.getElementById('configBadge');
                 const status = document.getElementById('configStatus');
+                const domainElement = document.getElementById('currentDomain');
                 
                 badge.className = 'config-badge ' + config.type;
                 if (config.type === 'nacos') {
                     status.textContent = 'Nacos: ' + (config.data.server || '未连接');
+                    // 从server地址中提取域名
+                    if (config.data.server) {
+                        try {
+                            const url = new URL(config.data.server);
+                            domainElement.textContent = url.hostname;
+                        } catch (e) {
+                            domainElement.textContent = config.data.server;
+                        }
+                    } else {
+                        domainElement.textContent = '未连接';
+                    }
                     // 恢复Nacos表单数据
                     if (config.data.server) {
                         document.getElementById('server_addresses').value = config.data.server;
@@ -296,6 +335,7 @@
                     }
                 } else {
                     status.textContent = '环境: ' + config.data.envName;
+                    domainElement.textContent = config.data.envName;
                     // 恢复环境选择
                     const envSelect = document.getElementById('environment');
                     if (envSelect) {

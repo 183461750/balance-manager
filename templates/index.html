@@ -24,6 +24,35 @@
         }
         .form-group {
             margin-bottom: 15px;
+            position: relative;
+        }
+        .form-group.optional {
+            opacity: 0.7;
+        }
+        .form-group.optional:hover {
+            opacity: 1;
+        }
+        .form-group.optional label::after {
+            content: ' (可选)';
+            font-size: 0.85em;
+            color: #666;
+            font-weight: normal;
+        }
+        .form-group.optional .default-value {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.85em;
+            color: #666;
+            pointer-events: none;
+        }
+        input:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+        input:focus + .default-value {
+            display: none;
         }
         label {
             display: block;
@@ -252,6 +281,68 @@
             padding: 2px 8px;
             color: transparent;
         }
+        /* 添加Toast提示样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.success {
+            background-color: #4CAF50;
+        }
+        .toast.error {
+            background-color: #f44336;
+        }
+        .toast i {
+            font-size: 1.2em;
+        }
+        .advanced-options-toggle {
+            margin: 15px 0;
+            text-align: left;
+        }
+        
+        .advanced-options-toggle .btn-link {
+            color: #666;
+            text-decoration: none;
+            padding: 0;
+            font-size: 0.9em;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .advanced-options-toggle .btn-link:hover {
+            color: #333;
+        }
+        
+        .advanced-options {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .advanced-options .form-group:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -313,19 +404,28 @@
                 <form id="nacosForm">
                     <div class="form-group">
                         <label for="server_addresses">Nacos服务器地址:</label>
-                        <input type="text" id="server_addresses" name="server_addresses" placeholder="例如: http://localhost:8848">
+                        <input type="text" id="server_addresses" name="server_addresses" required 
+                               placeholder="请输入IP地址，例如: 10.0.1.94">
                     </div>
-                    <div class="form-group">
-                        <label for="namespace">命名空间:</label>
-                        <input type="text" id="namespace" name="namespace" placeholder="可选">
+                    <div class="advanced-options-toggle">
+                        <button type="button" class="btn btn-link" onclick="toggleAdvancedOptions()">
+                            <i class="bi bi-gear"></i> 高级选项
+                        </button>
                     </div>
-                    <div class="form-group">
-                        <label for="username">用户名:</label>
-                        <input type="text" id="username" name="username" placeholder="可选">
-                    </div>
-                    <div class="form-group">
-                        <label for="password">密码:</label>
-                        <input type="password" id="password" name="password" placeholder="可选">
+                    <div id="advancedOptions" class="advanced-options" style="display: none;">
+                        <div class="form-group optional">
+                            <label for="namespace">命名空间:</label>
+                            <input type="text" id="namespace" name="namespace" value="server">
+                            <span class="default-value">默认值: server</span>
+                        </div>
+                        <div class="form-group optional">
+                            <label for="username">用户名:</label>
+                            <input type="text" id="username" name="username">
+                        </div>
+                        <div class="form-group optional">
+                            <label for="password">密码:</label>
+                            <input type="password" id="password" name="password">
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary">连接Nacos</button>
                 </form>
@@ -346,6 +446,9 @@
             </div>
         </div>
     </div>
+
+    <!-- 添加Toast容器 -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
         // 配置状态管理
@@ -477,10 +580,51 @@
             }
         }
 
-        // Nacos配置表单提交
+        // Toast管理器
+        const ToastManager = {
+            container: null,
+            queue: [],
+            
+            init: function() {
+                this.container = document.getElementById('toastContainer');
+            },
+            
+            show: function(message, type = 'success', duration = 3000) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                // 根据类型选择图标
+                const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
+                
+                toast.innerHTML = `
+                    <i class="bi ${icon}"></i>
+                    <span>${message}</span>
+                `;
+                
+                this.container.appendChild(toast);
+                
+                // 触发重排以启动动画
+                void toast.offsetWidth;
+                toast.classList.add('show');
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        this.container.removeChild(toast);
+                    }, 300);
+                }, duration);
+            }
+        };
+
+        // 修改Nacos配置表单提交处理
         document.getElementById('nacosForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
+            
+            // 如果命名空间为空，使用默认值
+            if (!formData.get('namespace').trim()) {
+                formData.set('namespace', 'server');
+            }
             
             try {
                 const response = await fetch('/set_nacos_config', {
@@ -497,16 +641,17 @@
                         username: formData.get('username')
                     });
                     closeConfigModal();
-                    alert('Nacos配置成功');
+                    // 使用Toast提示替代alert
+                    ToastManager.show('Nacos配置成功');
                 } else {
-                    alert('错误: ' + data.message);
+                    ToastManager.show(data.message, 'error');
                 }
             } catch (error) {
-                alert('系统错误: ' + error.message);
+                ToastManager.show(error.message, 'error');
             }
         });
 
-        // 环境切换处理
+        // 修改环境切换处理
         document.getElementById('environment').addEventListener('change', async (e) => {
             const formData = new FormData();
             formData.append('environment', e.target.value);
@@ -527,10 +672,11 @@
                         envName: selectedEnv
                     });
                     closeConfigModal();
-                    alert('环境切换成功');
+                    // 使用Toast提示替代alert
+                    ToastManager.show(`已切换到${selectedEnv}`);
                 }
             } catch (error) {
-                alert('切换环境失败: ' + error.message);
+                ToastManager.show(`切换环境失败: ${error.message}`, 'error');
             }
         });
 
@@ -703,6 +849,32 @@
                 console.error('Error:', error);
                 showResult('设置失败: ' + error, false);
             });
+        }
+
+        // 页面加载时初始化Toast管理器
+        document.addEventListener('DOMContentLoaded', () => {
+            ToastManager.init();
+        });
+
+        // 添加高级选项切换功能
+        function toggleAdvancedOptions() {
+            const advancedOptions = document.getElementById('advancedOptions');
+            const isHidden = advancedOptions.style.display === 'none';
+            
+            if (isHidden) {
+                advancedOptions.style.display = 'block';
+                // 使用 requestAnimationFrame 确保过渡动画顺滑
+                requestAnimationFrame(() => {
+                    advancedOptions.style.opacity = '1';
+                    advancedOptions.style.transform = 'translateY(0)';
+                });
+            } else {
+                advancedOptions.style.opacity = '0';
+                advancedOptions.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    advancedOptions.style.display = 'none';
+                }, 300);
+            }
         }
     </script>
 </body>

@@ -43,3 +43,5 @@ nacos-data/
 # OS
 .DS_Store
 Thumbs.db 
+
+balance-manager.tar 

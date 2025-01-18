@@ -529,6 +529,54 @@
                 closeConfigModal();
             }
         }
+
+        // 获取网关地址
+        function updateGatewayUrl() {
+            fetch('/get_gateway_url')
+                .then(response => response.json())
+                .then(data => {
+                    const domainElement = document.getElementById('currentDomain');
+                    if (data.success) {
+                        domainElement.textContent = data.gateway_url;
+                    } else {
+                        domainElement.textContent = '未配置';
+                    }
+                })
+                .catch(error => {
+                    console.error('获取网关地址失败:', error);
+                    document.getElementById('currentDomain').textContent = '连接失败';
+                });
+        }
+
+        // 页面加载时获取网关地址
+        document.addEventListener('DOMContentLoaded', function() {
+            updateGatewayUrl();
+        });
+
+        // 在设置Nacos配置后更新网关地址
+        function setNacosConfig(event) {
+            event.preventDefault();
+            const formData = new FormData(document.getElementById('nacosForm'));
+            
+            fetch('/set_nacos_config', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateGatewayUrl();  // 更新网关地址
+                    document.getElementById('configBadge').className = 'config-badge nacos';
+                    document.getElementById('configStatus').textContent = 'Nacos配置';
+                    closeConfigModal();
+                }
+                showResult(data.message, data.success);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showResult('设置失败: ' + error, false);
+            });
+        }
     </script>
 </body>
 </html> 

@@ -91,19 +91,22 @@ def get_nacos_config():
         config = yaml.safe_load(content)
         logger.info(f"解析后的配置: {config}")
         
-        # 提取PostgreSQL配置
+        # 提取PostgreSQL配置和网关地址
+        result = {}
         if 'pgsql' in config:
             pg_config = config['pgsql']
-            return {
+            result['db_config'] = {
                 'host': pg_config.get('address', 'localhost'),
                 'port': int(pg_config.get('port', 5432)),
                 'user': pg_config.get('username', 'postgres'),
                 'password': pg_config.get('password', ''),
                 'dbname': pg_config.get('dbname', 'postgres')
             }
-        else:
-            logger.error("配置中未找到pgsql部分")
-            return None
+        
+        if 'gateway' in config and 'url' in config['gateway']:
+            result['gateway_url'] = config['gateway']['url']
+            
+        return result
     except Exception as e:
         logger.error(f"获取Nacos配置失败: {str(e)}")
         logger.exception(e)  # 打印详细的错误堆栈
@@ -115,8 +118,8 @@ def get_db_config():
     
     if config_type == 'nacos':
         nacos_config = get_nacos_config()
-        if nacos_config:
-            return nacos_config
+        if nacos_config and 'db_config' in nacos_config:
+            return nacos_config['db_config']
         logger.warning("无法获取Nacos配置，将使用本地配置")
     
     # 使用本地配置
@@ -318,6 +321,27 @@ def disable_nacos():
         'success': True,
         'message': '已切换回本地配置模式'
     })
+
+@app.route('/get_gateway_url')
+def get_gateway_url():
+    """获取网关地址"""
+    try:
+        nacos_config = get_nacos_config()
+        if nacos_config and 'gateway_url' in nacos_config:
+            return jsonify({
+                'success': True,
+                'gateway_url': nacos_config['gateway_url']
+            })
+        return jsonify({
+            'success': False,
+            'message': '未找到网关配置'
+        })
+    except Exception as e:
+        logger.error(f"获取网关地址失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000, debug=True) 

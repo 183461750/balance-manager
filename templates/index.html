@@ -394,12 +394,7 @@
             <span class="modal-close" onclick="closeConfigModal()">&times;</span>
             <h3>数据库配置</h3>
             
-            <div class="nav-tabs">
-                <div class="nav-tab active" onclick="switchTab('nacos')">Nacos配置</div>
-                <div class="nav-tab" onclick="switchTab('env')">环境变量配置</div>
-            </div>
-            
-            <!-- Nacos配置表单 -->
+            <!-- 移除Tab切换 -->
             <div id="nacosTab" class="tab-content active">
                 <form id="nacosForm">
                     <div class="form-group">
@@ -429,20 +424,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary">连接Nacos</button>
                 </form>
-            </div>
-            
-            <!-- 环境变量配置 -->
-            <div id="envTab" class="tab-content">
-                <div class="form-group">
-                    <label for="environment">选择环境:</label>
-                    <select id="environment" name="environment" class="form-control">
-                        {% for env_key, env in environments.items() %}
-                        <option value="{{ env_key }}" {% if env_key == current_env %}selected{% endif %}>
-                            {{ env.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
             </div>
         </div>
     </div>
@@ -651,35 +632,6 @@
             }
         });
 
-        // 修改环境切换处理
-        document.getElementById('environment').addEventListener('change', async (e) => {
-            const formData = new FormData();
-            formData.append('environment', e.target.value);
-            
-            try {
-                const response = await fetch('/set_environment', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    const envSelect = document.getElementById('environment');
-                    const selectedEnv = envSelect.options[envSelect.selectedIndex].text;
-                    // 保存环境配置
-                    ConfigManager.saveConfig('env', {
-                        envKey: e.target.value,
-                        envName: selectedEnv
-                    });
-                    closeConfigModal();
-                    // 使用Toast提示替代alert
-                    ToastManager.show(`已切换到${selectedEnv}`);
-                }
-            } catch (error) {
-                ToastManager.show(`切换环境失败: ${error.message}`, 'error');
-            }
-        });
-
         // 余额修改表单提交
         document.getElementById('balanceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -730,6 +682,8 @@
                 // 如果没有保存的配置，设置默认状态
                 ConfigManager.saveConfig('nacos', { server: '未连接' });
             }
+            
+            ToastManager.init();
         });
 
         // 点击模态框外部关闭
@@ -740,19 +694,58 @@
             }
         }
 
-        // 添加域名缓存管理
+        // 修改获取网关地址的函数
+        function updateGatewayUrl() {
+            // 检查是否有缓存的域名
+            const cachedDomain = DomainManager.getFromCache();
+            if (cachedDomain) {
+                DomainManager.updateDomainDisplay(cachedDomain);
+            }
+            
+            // 无论是否有缓存，都尝试获取最新数据
+            DomainManager.updateDomainDisplay(null, true);  // 显示加载状态
+            
+            fetch('/get_gateway_url')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.gateway_url) {
+                        DomainManager.updateDomainDisplay(data.gateway_url);
+                        // 更新缓存
+                        DomainManager.saveToCache(data.gateway_url);
+                    } else {
+                        // 如果获取失败但有缓存，保持显示缓存的域名
+                        const fallbackDomain = DomainManager.getFromCache();
+                        if (fallbackDomain) {
+                            DomainManager.updateDomainDisplay(fallbackDomain);
+                        } else {
+                            DomainManager.updateDomainDisplay(null);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('获取网关地址失败:', error);
+                    // 发生错误时，尝试使用缓存的域名
+                    const fallbackDomain = DomainManager.getFromCache();
+                    if (fallbackDomain) {
+                        DomainManager.updateDomainDisplay(fallbackDomain);
+                    } else {
+                        DomainManager.updateDomainDisplay(null);
+                    }
+                });
+        }
+
+        // 修改域名管理器
         const DomainManager = {
             CACHE_KEY: 'gatewayDomain',
             
-            // 保存域名到缓存
             saveToCache: function(domain) {
+                if (!domain) return;
                 localStorage.setItem(this.CACHE_KEY, JSON.stringify({
                     domain: domain,
                     timestamp: new Date().getTime()
                 }));
             },
             
-            // 从缓存获取域名
             getFromCache: function() {
                 const saved = localStorage.getItem(this.CACHE_KEY);
                 if (saved) {
@@ -769,16 +762,13 @@
                 return null;
             },
             
-            // 更新域名显示
             updateDomainDisplay: function(domain, isLoading = false) {
                 const domainElement = document.getElementById('currentDomain');
                 const tooltip = domainElement.querySelector('.tooltip');
                 
-                if (isLoading) {
+                if (isLoading && !domain) {
                     domainElement.className = 'loading';
                     domainElement.textContent = '加载中...';
-                    domainElement.title = '';
-                    if (tooltip) tooltip.textContent = '';
                     return;
                 }
                 
@@ -787,39 +777,20 @@
                     domainElement.textContent = domain;
                     domainElement.title = domain;
                     if (tooltip) tooltip.textContent = domain;
-                    this.saveToCache(domain);
                 } else {
-                    domainElement.textContent = '未配置';
-                    domainElement.title = '';
-                    if (tooltip) tooltip.textContent = '';
+                    const cachedDomain = this.getFromCache();
+                    if (cachedDomain) {
+                        domainElement.textContent = cachedDomain;
+                        domainElement.title = cachedDomain;
+                        if (tooltip) tooltip.textContent = cachedDomain;
+                    } else {
+                        domainElement.textContent = '未配置';
+                        domainElement.title = '';
+                        if (tooltip) tooltip.textContent = '';
+                    }
                 }
             }
         };
-
-        // 修改获取网关地址的函数
-        function updateGatewayUrl() {
-            // 检查是否有缓存的域名
-            const cachedDomain = DomainManager.getFromCache();
-            if (cachedDomain) {
-                DomainManager.updateDomainDisplay(cachedDomain);
-            } else {
-                DomainManager.updateDomainDisplay(null, true);  // 显示加载状态
-            }
-            
-            fetch('/get_gateway_url')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        DomainManager.updateDomainDisplay(data.gateway_url);
-                    } else {
-                        DomainManager.updateDomainDisplay(null);
-                    }
-                })
-                .catch(error => {
-                    console.error('获取网关地址失败:', error);
-                    DomainManager.updateDomainDisplay(null);
-                });
-        }
 
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {

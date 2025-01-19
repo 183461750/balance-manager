@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# 设置错误处理
+set -e
+trap 'echo "错误发生在第 $LINENO 行"' ERR
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,6 +12,8 @@ NC='\033[0m' # No Color
 
 # 默认环境
 ENV="dev"
+HEALTH_CHECK_RETRIES=5
+HEALTH_CHECK_INTERVAL=5
 
 # 打印带颜色的消息
 print_message() {
@@ -42,6 +48,22 @@ show_help() {
     echo "  $0 -d -e prod        # 仅在生产环境执行部署"
 }
 
+# 检查必要的命令
+check_requirements() {
+    local requirements=("docker" "docker-compose" "yq" "ssh")
+    for cmd in "${requirements[@]}"; do
+        if ! command -v $cmd &> /dev/null; then
+            print_message "$RED" "错误: 未找到命令 '$cmd'"
+            if [ "$cmd" = "yq" ]; then
+                print_message "$YELLOW" "请运行 'brew install yq' 安装"
+            else
+                print_message "$YELLOW" "请安装 $cmd"
+            fi
+            exit 1
+        fi
+    done
+}
+
 # 加载环境配置
 load_env() {
     # 检查环境配置文件
@@ -49,12 +71,6 @@ load_env() {
         print_message "$RED" "错误: 环境配置文件不存在"
         print_message "$YELLOW" "请复制 deploy/env.template.yaml 到 deploy/env.yaml 并修改配置"
         exit 1
-    }
-
-    # 使用yq读取配置
-    if ! command -v yq &> /dev/null; then
-        print_message "$YELLOW" "正在安装yq..."
-        brew install yq
     fi
 
     # 读取环境配置
@@ -78,6 +94,16 @@ load_env() {
     echo "镜像: $FULL_IMAGE_NAME"
 }
 
+# 检查服务器连接
+check_server() {
+    print_message "$YELLOW" "检查目标服务器连接..."
+    if ! ssh -q $HOST exit; then
+        print_message "$RED" "错误: 无法连接到服务器 $HOST"
+        exit 1
+    fi
+    check_status "服务器连接检查"
+}
+
 # 构建镜像
 build_image() {
     print_message "$YELLOW" "=== 开始构建镜像 ==="
@@ -85,37 +111,57 @@ build_image() {
     # 设置环境变量
     export IMAGE_NAME="$IMAGE_NAME"
     export IMAGE_TAG="$IMAGE_TAG"
-    export REGISTRY="$REGISTRY/$NAMESPACE"
+    export REGISTRY="$REGISTRY"
+    export NAMESPACE="$NAMESPACE"
     
     # 执行构建脚本
-    ./build_and_push.sh
+    cd $(dirname $0) && ./build_and_push.sh && cd - > /dev/null
     check_status "镜像构建和推送"
+}
+
+# 检查服务健康状态
+check_service_health() {
+    local retries=$HEALTH_CHECK_RETRIES
+    local interval=$HEALTH_CHECK_INTERVAL
+    
+    print_message "$YELLOW" "检查服务健康状态..."
+    while [ $retries -gt 0 ]; do
+        if ssh $HOST "curl -s http://localhost:$PORT/health" | grep -q "ok"; then
+            print_message "$GREEN" "✓ 服务健康检查通过"
+            return 0
+        fi
+        retries=$((retries-1))
+        if [ $retries -gt 0 ]; then
+            print_message "$YELLOW" "等待服务启动... (剩余重试次数: $retries)"
+            sleep $interval
+        fi
+    done
+    
+    print_message "$RED" "✗ 服务健康检查失败"
+    return 1
 }
 
 # 部署服务
 deploy_service() {
     print_message "$YELLOW" "=== 开始部署服务 ==="
     
-    # 检查服务健康状态
-    print_message "$YELLOW" "检查目标服务器连接..."
-    ssh $HOST 'exit' 2>/dev/null
-    check_status "服务器连接检查"
+    # 检查服务器连接
+    check_server
     
     # 更新配置文件
     print_message "$YELLOW" "更新部署配置..."
-    cat > deploy/config.yaml << EOF
-ssh:
-  host: $HOST
-  project_path: $PROJECT_PATH
-
-backup:
-  enabled: true
-  path: $BACKUP_PATH
-  keep_days: 7
-
-commands:
-  - docker-compose down
-  - docker-compose up -d
+    cat > deploy/env.yaml << EOF
+environments:
+  dev:
+    host: $HOST
+    port: $PORT
+    project_path: $PROJECT_PATH
+    backup_path: $BACKUP_PATH
+    image:
+      registry: $REGISTRY
+      namespace: $NAMESPACE
+      name: $IMAGE_NAME
+      tag: $IMAGE_TAG
 EOF
     check_status "配置更新"
     
@@ -123,15 +169,12 @@ EOF
     python deploy/deploy.py
     check_status "服务部署"
     
-    # 验证部署
-    print_message "$YELLOW" "验证服务状态..."
-    sleep 5  # 等待服务完全启动
+    # 等待服务启动
+    print_message "$YELLOW" "等待服务启动..."
+    sleep 5
     
     # 检查服务状态
-    if ssh $HOST "cd $PROJECT_PATH && docker-compose ps | grep 'Up'"; then
-        print_message "$GREEN" "✓ 服务已成功启动"
-        
-        # 显示服务访问信息
+    if ssh $HOST "cd $PROJECT_PATH && docker-compose ps | grep 'Up'" && check_service_health; then
         print_message "$GREEN" "=== 部署完成 ==="
         print_message "$GREEN" "服务访问地址: http://$HOST:$PORT"
     else
@@ -141,6 +184,9 @@ EOF
         exit 1
     fi
 }
+
+# 检查必要的命令
+check_requirements
 
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do

@@ -1,0 +1,7 @@
+Flask==3.0.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+nacos-sdk-python==0.1.12
+PyYAML==6.0.1
+paramiko==3.4.0
+tqdm==4.66.1 

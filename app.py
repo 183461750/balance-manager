@@ -343,5 +343,33 @@ def get_gateway_url():
             'message': str(e)
         })
 
+@app.route('/health')
+def health_check():
+    """健康检查端点"""
+    try:
+        # 检查数据库连接
+        config = get_db_config()
+        conn = get_db_connection()
+        conn.close()
+        
+        # 检查Nacos连接（如果启用）
+        if session.get('config_type') == 'nacos' and nacos_client:
+            nacos_client.get_config('common.yml', 'v1.0.0')
+        
+        return jsonify({
+            'status': 'ok',
+            'message': '服务运行正常',
+            'config_type': session.get('config_type', 'env'),
+            'environment': session.get('current_env', 'dev')
+        })
+    except Exception as e:
+        logger.error(f"健康检查失败: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'config_type': session.get('config_type', 'env'),
+            'environment': session.get('current_env', 'dev')
+        }), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000, debug=True) 

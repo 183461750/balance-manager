@@ -45,3 +45,13 @@ nacos-data/
 Thumbs.db 
 
 balance-manager.tar 
+# 环境配置文件
+deploy/env.yaml
+deploy/config.yaml
+
+# Python
+__pycache__/
+*.pyc
+
+# 系统文件
+.DS_Store

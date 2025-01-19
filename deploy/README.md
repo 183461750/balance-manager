@@ -10,8 +10,7 @@ deploy/
   ├── deploy.py           # 部署核心逻辑
   ├── docker-compose.yml  # Docker编排文件
   ├── Dockerfile         # Docker构建文件
-  ├── env.template.yaml  # 环境配置模板
-  └── .env.example       # 环境变量模板
+  └── env.template.yaml  # 环境配置模板
 ```
 
 ## 快速部署

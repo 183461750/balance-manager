@@ -16,6 +16,7 @@
 - Python 3.9+
 - Docker
 - Docker Compose
+- yq (用于解析YAML配置)
 
 ### 本地开发
 
@@ -37,29 +38,40 @@
 
 ### 部署
 
-项目提供了一键部署脚本 `deploy.sh`，支持以下功能：
+项目提供了一键部署脚本 `deploy.sh`，支持多环境部署：
 
-1. 完整部署流程：
+1. 配置环境：
    ```bash
+   # 复制环境配置模板
+   cp deploy/env.template.yaml deploy/env.yaml
+   
+   # 修改配置文件
+   vim deploy/env.yaml
+   ```
+
+2. 部署命令：
+   ```bash
+   # 完整部署流程（默认开发环境）
    ./deploy.sh
+
+   # 指定环境部署
+   ./deploy.sh -e test  # 测试环境
+   ./deploy.sh -e prod  # 生产环境
+
+   # 仅构建镜像
+   ./deploy.sh -b -e test
+
+   # 仅部署服务
+   ./deploy.sh -d -e prod
    ```
 
-2. 仅构建镜像：
-   ```bash
-   ./deploy.sh --build
-   ```
-
-3. 仅部署服务：
-   ```bash
-   ./deploy.sh --deploy
-   ```
-
-4. 查看帮助：
+3. 查看帮助：
    ```bash
    ./deploy.sh --help
    ```
 
 部署脚本特性：
+- 支持多环境配置（开发、测试、生产）
 - 自动构建多架构镜像（支持 arm64/amd64）
 - 使用阿里云镜像仓库加速部署
 - 自动备份已部署的服务
@@ -68,26 +80,46 @@
 
 ## 配置说明
 
-1. 创建配置文件：
-   ```bash
-   cp deploy/config.template.yaml deploy/config.yaml
-   ```
+### 环境配置 (deploy/env.yaml)
 
-2. 修改配置：
-   ```yaml
-   ssh:
-     host: dev-2023.intranet.company  # 部署服务器
-     project_path: /www/data/tools/balance-manager/project  # 项目路径
-   
-   backup:
-     enabled: true  # 是否启用备份
-     path: /www/data/tools/balance-manager/backup  # 备份路径
-     keep_days: 7  # 保留天数
-   
-   commands:  # 部署后执行的命令
-     - docker-compose down
-     - docker-compose up -d
-   ```
+```yaml
+environments:
+  dev:  # 开发环境
+    host: dev-2023.intranet.company
+    port: 3000
+    project_path: /www/data/tools/balance-manager/project
+    backup_path: /www/data/tools/balance-manager/backup
+    image:
+      registry: registry.cn-hangzhou.aliyuncs.com
+      namespace: iuin
+      name: balance-manager
+      tag: latest
+
+  test:  # 测试环境配置
+    ...
+
+  prod:  # 生产环境配置
+    ...
+```
+
+### 部署配置
+
+部署脚本会根据环境配置自动生成 `deploy/config.yaml`：
+
+```yaml
+ssh:
+  host: {环境对应的主机}
+  project_path: {环境对应的项目路径}
+
+backup:
+  enabled: true
+  path: {环境对应的备份路径}
+  keep_days: 7
+
+commands:
+  - docker-compose down
+  - docker-compose up -d
+```
 
 ## 开发规范
 

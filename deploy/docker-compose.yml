@@ -2,7 +2,7 @@ version: '3'
 
 services:
   balance-manager:
-    image: ${DOCKER_IMAGE:-balance-manager:local}
+    image: registry.cn-hangzhou.aliyuncs.com/iuin/balance-manager:${IMAGE_TAG:-latest}
     container_name: ${CONTAINER_NAME:-balance-manager}
     ports:
       - "${PORT:-3000}:3000"

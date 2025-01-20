@@ -13,62 +13,73 @@ deploy/
   └── env.template.yaml  # 环境配置模板
 ```
 
-## 快速部署
+## 快速开始
 
-### 1. 环境准备
+### 1. 本地开发
 
-1. 安装必要工具：
+1. 构建本地镜像：
    ```bash
-   # macOS
-   brew install yq pv
+   # 在项目根目录下执行
+   docker build -t balance-manager:local -f deploy/Dockerfile .
    ```
+
+2. 启动服务：
+   ```bash
+   # 在项目根目录下执行
+   docker-compose -f deploy/docker-compose.yml up -d
+   ```
+
+3. 配置Nacos：
+   - 访问 http://localhost:3000
+   - 点击右上角设置按钮
+   - 输入Nacos服务器地址和命名空间信息
+
+4. 查看日志：
+   ```bash
+   docker-compose -f deploy/docker-compose.yml logs -f
+   ```
+
+### 2. 环境部署
+
+1. 环境准备：
+   - 安装必要工具：
+     ```bash
+     # macOS
+     brew install yq pv
+     ```
+   - 确保目标服务器：
+     * 已安装 Docker 和 Docker Compose
+     * 已配置 SSH 免密登录
+     * 已开放相应端口(默认3000)
 
 2. 配置环境：
    ```bash
-   # 复制环境配置
+   # 复制并修改环境配置
    cp env.template.yaml env.yaml
-   cp .env.example .env
-   
-   # 修改配置
    vim env.yaml
-   vim .env
    ```
 
-3. 确保目标服务器：
-   - 已安装 Docker 和 Docker Compose
-   - 已配置 SSH 免密登录
-   - 已开放相应端口(默认3000)
+3. 部署命令：
+   ```bash
+   # 开发环境（默认）
+   ./deploy.sh
+   
+   # 测试环境
+   ./deploy.sh -e test
+   
+   # 生产环境
+   ./deploy.sh -e prod
+   
+   # 仅构建镜像
+   ./deploy.sh -b
+   
+   # 仅部署服务
+   ./deploy.sh -d
+   ```
 
-### 2. 部署命令
+## 环境配置
 
-```bash
-# 完整部署流程（默认开发环境）
-./deploy.sh
-
-# 指定环境部署
-./deploy.sh -e test  # 测试环境
-./deploy.sh -e prod  # 生产环境
-
-# 仅构建镜像
-./deploy.sh -b
-
-# 仅部署服务
-./deploy.sh -d
-```
-
-### 3. 验证部署
-
-```bash
-# 检查服务状态
-ssh <目标服务器> 'cd <项目路径> && docker-compose ps'
-
-# 查看服务日志
-ssh <目标服务器> 'cd <项目路径> && docker-compose logs -f'
-```
-
-## 配置说明
-
-### 1. 环境配置 (env.yaml)
+### 环境配置文件 (env.yaml)
 
 ```yaml
 environments:
@@ -81,21 +92,31 @@ environments:
       registry: registry.cn-hangzhou.aliyuncs.com
       namespace: iuin
       name: balance-manager
-      tag: latest
-```
-
-### 2. 环境变量 (.env)
-
-```env
-# Nacos配置
-NACOS_HOST=nacos-server
-NACOS_PORT=8848
-NACOS_NAMESPACE=public
+      tag: dev
 ```
 
 ## 问题排查
 
-### 1. 部署失败
+### 1. 本地开发问题
+
+1. 服务无法启动：
+   ```bash
+   # 检查容器状态
+   docker-compose -f deploy/docker-compose.yml ps
+   
+   # 查看详细日志
+   docker-compose -f deploy/docker-compose.yml logs
+   ```
+
+2. 重新构建和启动：
+   ```bash
+   # 完全重建
+   docker-compose -f deploy/docker-compose.yml down
+   docker build -t balance-manager:local -f deploy/Dockerfile .
+   docker-compose -f deploy/docker-compose.yml up -d
+   ```
+
+### 2. 环境部署问题
 
 1. SSH连接问题:
    ```bash
@@ -109,27 +130,21 @@ NACOS_NAMESPACE=public
    ls -la <项目路径>
    ```
 
-### 2. 服务异常
-
-1. 检查日志:
+3. 服务异常：
    ```bash
-   # 查看实时日志
-   docker-compose logs -f
-   ```
-
-2. 重启服务:
-   ```bash
-   docker-compose restart
+   # 在目标服务器上查看日志
+   ssh <目标服务器> 'cd <项目路径> && docker-compose logs -f'
    ```
 
 ## 最佳实践
 
-1. 部署准备
-   - 确保配置文件正确
-   - 检查服务器环境
-   - 准备回滚方案
+1. 开发流程
+   - 本地开发和测试
+   - 提交代码前确保本地运行正常
+   - 使用正确的环境配置
 
-2. 部署过程
-   - 分步骤部署验证
+2. 部署流程
+   - 总是先在测试环境验证
    - 保持备份以便回滚
-   - 关注部署日志 
+   - 关注部署日志
+   - 部署后及时验证功能 

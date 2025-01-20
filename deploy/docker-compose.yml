@@ -2,15 +2,15 @@ version: '3'
 
 services:
   balance-manager:
-    image: registry.cn-hangzhou.aliyuncs.com/iuin/balance-manager:latest
-    container_name: balance-manager
+    image: ${DOCKER_IMAGE:-balance-manager:local}
+    container_name: ${CONTAINER_NAME:-balance-manager}
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
+      - FLASK_ENV=${FLASK_ENV:-development}
+      - FLASK_DEBUG=${FLASK_DEBUG:-1}
     volumes:
-      - .:/app
+      - ..:/app
     networks:
       - balance-network
     restart: always

@@ -1,0 +1,9 @@
+# 系统配置
+title: "系统辅助工具"
+
+# Nacos配置(固定值和默认值)
+nacos:
+  default_server: "localhost"
+  default_namespace: "server"
+  config_file: "common.yml"
+  config_group: "v1.0.0" 

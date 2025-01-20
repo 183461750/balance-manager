@@ -78,9 +78,13 @@ def get_nacos_config():
         return None
     
     try:
-        # 获取common.yml的内容
-        logger.info("尝试获取Nacos配置: common.yml")
-        content = nacos_client.get_config('common.yml', 'v1.0.0')
+        # 从配置文件获取默认值
+        config_file = config.get('nacos', {}).get('config_file', 'common.yml')
+        config_group = config.get('nacos', {}).get('config_group', 'v1.0.0')
+        
+        # 获取配置内容
+        logger.info(f"尝试获取Nacos配置: {config_file}")
+        content = nacos_client.get_config(config_file, config_group)
         logger.info(f"获取到的配置内容: {content}")
         
         if not content:
@@ -88,13 +92,13 @@ def get_nacos_config():
             return None
         
         # 解析YAML内容
-        config = yaml.safe_load(content)
-        logger.info(f"解析后的配置: {config}")
+        nacos_config = yaml.safe_load(content)
+        logger.info(f"解析后的配置: {nacos_config}")
         
         # 提取PostgreSQL配置和网关地址
         result = {}
-        if 'pgsql' in config:
-            pg_config = config['pgsql']
+        if 'pgsql' in nacos_config:
+            pg_config = nacos_config['pgsql']
             result['db_config'] = {
                 'host': pg_config.get('address', 'localhost'),
                 'port': int(pg_config.get('port', 5432)),
@@ -103,14 +107,14 @@ def get_nacos_config():
                 'dbname': pg_config.get('dbname', 'postgres')
             }
         
-        if 'gateway' in config and 'url' in config['gateway']:
-            result['gateway_url'] = config['gateway']['url']
+        if 'gateway' in nacos_config and 'url' in nacos_config['gateway']:
+            result['gateway_url'] = nacos_config['gateway']['url']
             
         return result
     except Exception as e:
         logger.error(f"获取Nacos配置失败: {str(e)}")
         logger.exception(e)  # 打印详细的错误堆栈
-    return None
+        return None
 
 def get_db_config():
     """获取当前环境的数据库配置"""
@@ -163,14 +167,47 @@ def calculate_md5(value):
     """计算余额的MD5值"""
     return hashlib.md5(str(value).encode()).hexdigest()
 
+def calculate_password_md5(plain_password):
+    """计算密码的MD5值"""
+    MD5_SALT = "lingxi"
+    return hashlib.md5((MD5_SALT + plain_password).encode()).hexdigest()
+
+def load_config():
+    """加载配置文件"""
+    config_path = os.path.join('config', 'config.yaml')
+    template_path = os.path.join('config', 'config.template.yaml')
+    
+    # 如果配置文件不存在,复制模板
+    if not os.path.exists(config_path) and os.path.exists(template_path):
+        with open(template_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(config, f, allow_unicode=True)
+    
+    # 加载配置
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        logger.error(f"加载配置文件失败: {str(e)}")
+        # 返回默认配置
+        return {
+            'title': '瓴犀辅助工具'
+        }
+
+# 加载配置
+config = load_config()
+
 @app.route('/')
 def index():
-    config_type = session.get('config_type', 'nacos')
-    current_env = session.get('current_env', 'dev')
-    return render_template('index.html', 
-                         environments=ENVIRONMENTS,
-                         current_env=current_env,
-                         config_type=config_type)
+    """首页"""
+    return render_template('index.html',
+                         title=config['title'],
+                         nacos=config.get('nacos', {
+                             'default_server': 'localhost',
+                             'default_namespace': 'server'
+                         }))
 
 @app.route('/set_environment', methods=['POST'])
 def set_environment():
@@ -354,7 +391,9 @@ def health_check():
         
         # 检查Nacos连接（如果启用）
         if session.get('config_type') == 'nacos' and nacos_client:
-            nacos_client.get_config('common.yml', 'v1.0.0')
+            config_file = config.get('nacos', {}).get('config_file', 'common.yml')
+            config_group = config.get('nacos', {}).get('config_group', 'v1.0.0')
+            nacos_client.get_config(config_file, config_group)
         
         return jsonify({
             'status': 'ok',
@@ -370,6 +409,77 @@ def health_check():
             'config_type': session.get('config_type', 'env'),
             'environment': session.get('current_env', 'dev')
         }), 500
+
+@app.route('/verify_password', methods=['POST'])
+def verify_password():
+    try:
+        phone = request.form['phone']
+        password = request.form['password']
+        
+        # 计算输入密码的MD5值
+        password_md5 = calculate_password_md5(password)
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 查询用户密码
+                sql = "SELECT password FROM mem_user WHERE phone = %s"
+                cursor.execute(sql, (phone,))
+                result = cursor.fetchone()
+                
+                if not result:
+                    return jsonify({'success': False, 'message': '未找到用户信息'})
+                
+                # 比较密码
+                stored_password = result[0]
+                if password_md5 == stored_password:
+                    return jsonify({
+                        'success': True,
+                        'message': '密码验证通过'
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': '密码不正确'
+                    })
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"验证密码失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/update_password', methods=['POST'])
+def update_password():
+    try:
+        phone = request.form['phone']
+        new_password = request.form['new_password']
+        
+        # 计算新密码的MD5值
+        new_password_md5 = calculate_password_md5(new_password)
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                # 更新密码
+                sql_update = "UPDATE mem_user SET password = %s WHERE phone = %s"
+                cursor.execute(sql_update, (new_password_md5, phone))
+                affected_rows = cursor.rowcount
+                
+                if affected_rows == 0:
+                    return jsonify({'success': False, 'message': '用户不存在'})
+                    
+                conn.commit()
+                return jsonify({
+                    'success': True,
+                    'message': '密码修改成功'
+                })
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"修改密码失败: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000, debug=True) 

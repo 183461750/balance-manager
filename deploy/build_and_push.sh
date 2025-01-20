@@ -27,7 +27,8 @@ docker buildx build \
     --push \
     --cache-from type=registry,ref=${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}:cache \
     --cache-to type=registry,ref=${REGISTRY}/${NAMESPACE}/${IMAGE_NAME}:cache,mode=max \
-    .
+    -f Dockerfile \
+    ..
 
 echo "构建和推送完成！"
 

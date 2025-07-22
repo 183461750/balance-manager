@@ -1,0 +1,450 @@
+/* Nacos配置组件样式 */
+.nacos-config-group {
+    margin-bottom: 1.5rem;
+}
+
+.nacos-config-container {
+    position: relative;
+    width: 100%;
+}
+
+.nacos-config-container .form-control {
+    border-radius: 6px;
+    padding: 0.65rem 1rem;
+    font-size: 0.95rem;
+    border: 1px solid #ced4da;
+    transition: all 0.2s ease;
+    flex-grow: 1;
+}
+
+.nacos-config-container .form-control:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.nacos-config-actions {
+    display: flex;
+}
+
+.btn-group button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.375rem 0.75rem;
+}
+
+.btn-group .btn-outline-secondary {
+    border-radius: 6px 0 0 6px;
+    border-right: none;
+}
+
+.btn-group .btn-primary {
+    border-radius: 0 6px 6px 0;
+}
+
+/* 下拉菜单样式优化 */
+#nacosConfigDropdown {
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 0.5rem 0;
+    margin-top: 0.25rem;
+    min-width: 280px;
+}
+
+#nacosConfigDropdown::before {
+    display: none;
+}
+
+#nacosConfigDropdown .dropdown-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    color: #333;
+    transition: all 0.15s ease;
+}
+
+#nacosConfigDropdown .dropdown-item:hover {
+    background-color: #f5f9ff;
+    color: #0d6efd;
+}
+
+#nacosConfigDropdown .dropdown-item.active,
+#nacosConfigDropdown .dropdown-item:active {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* 空状态样式 */
+#nacosConfigDropdown .dropdown-item.text-muted {
+    color: #6c757d;
+    font-style: italic;
+    padding: 0.7rem 1rem;
+}
+
+/* 分隔线样式 */
+#nacosConfigDropdown .dropdown-divider {
+    margin: 0.4rem 0;
+    border-color: #f5f5f5;
+}
+
+/* 响应式调整 */
+@media (max-width: 576px) {
+    .nacos-config-container.d-flex {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .btn-group button {
+        width: 40px;
+        height: 40px;
+    }
+}
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            position: relative;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .form-group.optional {
+            opacity: 0.7;
+        }
+        .form-group.optional:hover {
+            opacity: 1;
+        }
+        .form-group.optional label::after {
+            content: ' (可选)';
+            font-size: 0.85em;
+            color: #666;
+            font-weight: normal;
+        }
+        .form-group.optional .default-value {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.85em;
+            color: #666;
+            pointer-events: none;
+        }
+        input:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+        input:focus + .default-value {
+            display: none;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        /* 移除自定义按钮样式，使用Bootstrap默认样式 */
+        /* .btn-success {
+            background-color: #4CAF50;
+            color: white;
+        } */
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-settings {
+            position: static;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            color: #666;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.3s;
+            display: flex;
+            align-items: center;
+        }
+        .btn-settings:hover {
+            color: #333;
+        }
+        .config-badge {
+            position: static;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            white-space: nowrap;
+        }
+        .config-badge.nacos {
+            background-color: #e3f2fd;
+            border-color: #90caf9;
+            color: #1976d2;
+        }
+        .config-badge.env {
+            background-color: #e8f5e9;
+            border-color: #a5d6a7;
+            color: #388e3c;
+        }
+        .domain-bar {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            padding: 8px 20px;
+            font-size: 0.9em;
+            color: #6c757d;
+            margin: -20px -20px 20px -20px;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            width: auto;
+            box-sizing: border-box;
+            min-height: 40px;
+        }
+        .domain-bar .domain-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding-right: 0;
+            box-sizing: border-box;
+        }
+        .domain-bar i {
+            flex-shrink: 0;
+            font-size: 1.1em;
+            color: #0d6efd;
+        }
+        .domain-bar span {
+            flex-shrink: 0;
+        }
+        .domain-bar strong {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            padding: 2px 4px;
+            display: block;
+        }
+        .domain-bar strong:hover {
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        .domain-bar .separator {
+            color: #dee2e6;
+            margin: 0 5px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #dff0d8;
+            border: 1px solid #d6e9c6;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            border: 1px solid #ebccd1;
+            color: #a94442;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .modal-close {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #666;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .nav-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-tab.active {
+            border-bottom-color: #2196F3;
+            color: #2196F3;
+        }
+        .fade-enter {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* 添加工具提示样式 */
+        .tooltip {
+            position: absolute;
+            background-color: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 5px;
+        }
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        .domain-bar strong:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        /* 添加加载动画样式 */
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.4; }
+        }
+        .loading {
+            animation: pulse 1.5s ease-in-out infinite;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            padding: 2px 8px;
+            color: transparent;
+        }
+        /* 添加Toast提示样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.success {
+            background-color: #4CAF50;
+        }
+        .toast.error {
+            background-color: #f44336;
+        }
+        .toast i {
+            font-size: 1.2em;
+        }
+        .advanced-options-toggle {
+            margin: 15px 0;
+            text-align: left;
+        }
+        
+        .advanced-options-toggle .btn-link {
+            color: #666;
+            text-decoration: none;
+            padding: 0;
+            font-size: 0.9em;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .advanced-options-toggle .btn-link:hover {
+            color: #333;
+        }
+        
+        .advanced-options {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .advanced-options .form-group:last-child {
+            margin-bottom: 0;
+        }
+        .header-actions {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 2;
+        }

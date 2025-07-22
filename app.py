@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+import json
 import psycopg2
 from psycopg2.extras import DictCursor
 import hashlib
@@ -199,12 +200,65 @@ def load_config():
 # 加载配置
 config = load_config()
 
+@app.route('/get_nacos_configs')
+def get_nacos_configs():
+    """获取所有保存的Nacos配置"""
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'nacos_configs.json')
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            configs = json.load(f)
+            return jsonify(configs)
+    except FileNotFoundError:
+        return jsonify([]), 200
+    except json.JSONDecodeError:
+        logger.error('nacos_configs.json文件格式错误')
+        return jsonify({'error': '配置文件格式错误'}), 500
+    except Exception as e:
+        logger.error(f'读取配置文件失败: {str(e)}')
+        return jsonify({'error': '读取配置失败'}), 500
+
+@app.route('/save_nacos_config', methods=['POST'])
+def save_nacos_config():
+    """保存Nacos配置"""
+    config_data = request.json
+    required_fields = ['server']
+    for field in required_fields:
+        if field not in config_data:
+            return jsonify({'error': f'缺少必要字段: {field}'}), 400
+
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'nacos_configs.json')
+    try:
+        # 读取现有配置
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                configs = json.load(f)
+        else:
+            configs = []
+
+        # 检查是否已存在相同server的配置
+        existing_index = next((i for i, c in enumerate(configs) if c['server'] == config_data['server']), None)
+        if existing_index is not None:
+            # 更新现有配置
+            configs[existing_index] = config_data
+        else:
+            # 添加新配置
+            configs.append(config_data)
+
+        # 写入文件
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(configs, f, ensure_ascii=False, indent=2)
+
+        return jsonify({'success': True, 'message': '配置保存成功'})
+    except Exception as e:
+        logger.error(f'保存配置失败: {str(e)}')
+        return jsonify({'error': '保存配置失败'}), 500
+
 @app.route('/')
 def index():
-    """首页"""
-    return render_template('index.html',
-                         title=config['title'],
-                         nacos=config.get('nacos', {
+    return render_template('index.html', 
+                           config=config,
+                           title=config['title'],
+                           nacos=config.get('nacos', {
                              'default_server': 'localhost',
                              'default_namespace': 'server'
                          }))

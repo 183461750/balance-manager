@@ -1,0 +1,14 @@
+[
+  {
+    "server": "10.0.1.79",
+    "namespace": "server",
+    "username": "",
+    "password": ""
+  },
+  {
+    "server": "10.0.1.90",
+    "namespace": "server",
+    "username": "nacos",
+    "password": ""
+  }
+]

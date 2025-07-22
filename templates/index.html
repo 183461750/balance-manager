@@ -365,7 +365,7 @@
                 <i class="bi bi-globe"></i>
                 <span>当前域名:</span>
                 <strong id="currentDomain" title="">
-                    未连接
+                    
                     <span class="tooltip"></span>
                 </strong>
             </div>
@@ -435,7 +435,7 @@
                 <div class="form-group">
                     <label for="server_addresses">Nacos服务器地址:</label>
                     <input type="text" id="server_addresses" name="server_addresses" required 
-                           placeholder="请输入IP地址，例如: {{ nacos.default_server }}">
+                           placeholder="请输入IP地址，例如: localhost">
                 </div>
                 <div class="advanced-options-toggle">
                     <button type="button" class="btn btn-link" onclick="toggleAdvancedOptions()">
@@ -451,12 +451,12 @@
                     <div class="form-group optional">
                         <label for="username">用户名:</label>
                         <input type="text" id="username" name="username">
-                        <span class="default-value">默认值: (空)</span>
+                        <span class="default-value">默认值: nacos</span>
                     </div>
                     <div class="form-group optional">
                         <label for="password">密码:</label>
                         <input type="password" id="password" name="password">
-                        <span class="default-value">默认值: (空)</span>
+                        <span class="default-value">默认值: nacos</span>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">连接Nacos</button>
@@ -472,6 +472,10 @@
         const ConfigManager = {
             // 保存配置到localStorage
             saveConfig: function(type, data) {
+                // 确保server不会被保存为'未连接'
+                if (data.server === '未连接') {
+                    data.server = '';
+                }
                 const config = {
                     type: type,
                     data: data,
@@ -489,6 +493,12 @@
                 if (saved) {
                     try {
                         const config = JSON.parse(saved);
+                        // 修复旧配置中的'未连接'文本
+                        if (config.data && config.data.server === '未连接') {
+                            config.data.server = '';
+                            // 保存修复后的配置
+                            this.saveConfig(config.type, config.data);
+                        }
                         this.updateUI(config);
                         // 加载配置后更新网关地址
                         updateGatewayUrl();
@@ -509,10 +519,10 @@
                 
                 badge.className = 'config-badge ' + config.type;
                 if (config.type === 'nacos') {
-                    status.textContent = 'Nacos: ' + (config.data.server || '未连接');
+                    status.textContent = 'Nacos: ' + (config.data.server || '');
                     // 恢复Nacos表单数据
-                    if (config.data.server) {
-                        document.getElementById('server_addresses').value = config.data.server;
+                    if (config.data.server !== undefined) {
+                        document.getElementById('server_addresses').value = config.data.server === '未连接' ? '' : config.data.server;
                         document.getElementById('namespace').value = config.data.namespace || '';
                         document.getElementById('username').value = config.data.username || '';
                     }
@@ -778,7 +788,7 @@
             const config = ConfigManager.loadConfig();
             if (!config) {
                 // 如果没有保存的配置，设置默认状态
-                ConfigManager.saveConfig('nacos', { server: '未连接' });
+                ConfigManager.saveConfig('nacos', { server: '' });
             }
             
             ToastManager.init();
@@ -882,7 +892,7 @@
                         domainElement.title = cachedDomain;
                         if (tooltip) tooltip.textContent = cachedDomain;
                     } else {
-                        domainElement.textContent = '未配置';
+                        domainElement.textContent = '';
                         domainElement.title = '';
                         if (tooltip) tooltip.textContent = '';
                     }

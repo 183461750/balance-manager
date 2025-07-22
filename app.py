@@ -311,10 +311,10 @@ def update_balance():
 @app.route('/set_nacos_config', methods=['POST'])
 def set_nacos_config():
     try:
-        server_addresses = request.form.get('server_addresses', '')
-        namespace = request.form.get('namespace', '')
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
+        server_addresses = request.form.get('server_addresses', '').strip() or 'localhost:8848'
+        namespace = request.form.get('namespace', '').strip() or ''
+        username = request.form.get('username', '').strip() or 'nacos'
+        password = request.form.get('password', '').strip() or 'nacos'
         
         if not server_addresses:
             return jsonify({
@@ -482,4 +482,4 @@ def update_password():
         return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000, debug=True) 
+    app.run(host='0.0.0.0', port=3000, debug=True)

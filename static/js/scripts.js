@@ -19,7 +19,7 @@ if (balanceForm) {
                 const config = ConfigManager.loadConfig();
                 let configInfo = '';
                 if (config.type === 'nacos') {
-                    configInfo = `<p>配置方式: Nacos配置 (${config.data.server})</p>`;
+                    configInfo = `<p>配置方式: Nacos配置 (${config.data.server_addresses})</p>`;
                 } else {
                     configInfo = `<p>环境: ${data.data.environment}</p>`;
                 }
@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const config = ConfigManager.loadConfig();
     if (!config) {
         // 如果没有保存的配置，设置默认状态
-        ConfigManager.saveConfig('nacos', { server: '' });
+        ConfigManager.saveConfig('nacos', { server_addresses: '' });
     }
     
     ToastManager.init();
@@ -134,10 +134,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 为输入框添加事件监听
     const serverInput = document.getElementById('server_addresses');
+    // 调试日志：检查输入值
+    console.log('保存前输入值:', serverInput.value);
+    // 调试日志：检查输入值
+    console.log('保存前输入值:', serverInput.value);
     if (serverInput) {
         serverInput.addEventListener('focus', loadNacosConfigs);
     }
 
+
+    // 添加Nacos表单提交处理
+    const nacosForm = document.getElementById('nacosForm');
+    if (nacosForm) {
+        nacosForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveNacosConfig();
+        });
+        console.log('Nacos表单提交事件已绑定');
+    } else {
+        console.log('未找到Nacos表单元素');
+    }
 
     updateGatewayUrl();
     BootstrapComponentManager.initAll();
@@ -148,12 +164,50 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 保存Nacos配置到服务器
 async function saveNacosConfig() {
-    const server = document.getElementById('server_addresses').value;
-    const namespace = document.getElementById('namespace').value;
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+    // 获取输入框元素并验证 - 双重检查ID和name属性
+    const serverInput = document.getElementById('server_addresses') || document.querySelector('input[name="server_addresses"]');
+    const namespaceInput = document.getElementById('namespace') || document.querySelector('input[name="namespace"]');
+    const usernameInput = document.getElementById('username') || document.querySelector('input[name="username"]');
+    const passwordInput = document.getElementById('password') || document.querySelector('input[name="password"]');
 
-    if (!server) {
+    // 详细元素检查日志
+    console.log('=== 元素选择诊断 ===');
+    console.log('服务器地址元素:', serverInput);
+    console.log('命名空间元素:', namespaceInput);
+    console.log('用户名元素:', usernameInput);
+    console.log('密码元素:', passwordInput);
+
+    if (!serverInput || !namespaceInput || !usernameInput || !passwordInput) {
+        console.error('配置表单元素缺失:', { serverInput, namespaceInput, usernameInput, passwordInput });
+        ToastManager.show('配置表单元素不完整', 'error');
+        return;
+    }
+
+    // 获取最新输入值 - 最终验证
+    const server_addresses = serverInput.value.trim();
+    const namespace = namespaceInput.value.trim();
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    // 输入值完整性检查
+    console.log('=== 输入值验证 ===');
+    console.log('服务器地址原始值:', serverInput.value);
+    console.log('服务器地址处理后:', server_addresses);
+    console.log('所有输入值:', { server_addresses, namespace, username, password: '******' });
+
+    if (!server_addresses) {
+        console.error('服务器地址为空:', server_addresses);
+        ToastManager.show('服务器地址不能为空', 'error');
+        return;
+    }
+
+    // 最终验证和调试日志
+    console.log('=== 开始保存Nacos配置 ===');
+    console.log('服务器地址输入值:', server_addresses);
+    console.log('命名空间输入值:', namespace);
+    console.log('用户名输入值:', username);
+
+    if (!server_addresses) {
         ToastManager.show('服务器地址不能为空', 'error');
         return;
     }
@@ -163,25 +217,37 @@ async function saveNacosConfig() {
         const response = await Promise.race([
             fetch('/save_nacos_config', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
-                    server: server,
-                    namespace: namespace,
-                    username: username,
-                    password: password
-                })
+                server_addresses: server_addresses,
+                namespace: namespace,
+                username: username,
+                password: password
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
             }),
             new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), 10000))
         ]);
+        // 先检查HTTP响应状态
+        if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status} ${response.statusText}`);
+        }
+        // 再解析响应数据
         const data = await response.json();
+        console.log('服务器响应:', data);
 
         if (data.success) {
             ToastManager.show('配置保存成功');
-            // 配置保存成功，无需重新加载配置列表
+            // 保存成功后更新本地配置缓存
+            ConfigManager.saveConfig('nacos', {
+                server_addresses: server_addresses,
+                namespace: namespace,
+                username: username
+            });
         } else {
-            ToastManager.show(data.message, 'error');
+            ToastManager.show(data.message || '保存失败', 'error');
         }
     } catch (error) {
         ToastManager.show('保存配置失败: ' + error.message, 'error');
@@ -230,7 +296,7 @@ async function loadNacosConfigs() {
 
         // 填充下拉选项
         configs.forEach(config => {
-            const address = config.server || config.server_addresses || '';
+            const address = config.server_addresses || '';
             if (!address) return; // 跳过无效地址
 
             const item = document.createElement('li');

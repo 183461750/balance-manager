@@ -221,7 +221,7 @@ def get_nacos_configs():
 def save_nacos_config():
     """保存Nacos配置"""
     config_data = request.json
-    required_fields = ['server']
+    required_fields = ['server_addresses']
     for field in required_fields:
         if field not in config_data:
             return jsonify({'error': f'缺少必要字段: {field}'}), 400
@@ -236,7 +236,7 @@ def save_nacos_config():
             configs = []
 
         # 检查是否已存在相同server的配置
-        existing_index = next((i for i, c in enumerate(configs) if c['server'] == config_data['server']), None)
+        existing_index = next((i for i, c in enumerate(configs) if c['server_addresses'] == config_data['server_addresses']), None)
         if existing_index is not None:
             # 更新现有配置
             configs[existing_index] = config_data
@@ -536,4 +536,4 @@ def update_password():
         return jsonify({'success': False, 'message': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=8001, debug=True)

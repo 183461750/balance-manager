@@ -24,13 +24,10 @@
         </div>
 
         <div class="header-actions">
-            <div id="configBadge" class="config-badge nacos">
+            <div id="configBadge" class="config-badge nacos" onclick="openConfigModal()">
                 <i class="bi bi-gear-fill"></i>
                 <span id="configStatus">Nacos配置</span>
             </div>
-            <button class="btn-settings" onclick="openConfigModal()">
-                <i class="bi bi-gear"></i>
-            </button>
         </div>
 
         <h2>{{ title }}</h2>
@@ -110,8 +107,13 @@
                 <div id="advancedOptions" class="advanced-options" style="display: none;">
                     <div class="form-group optional">
                         <label for="namespace">命名空间:</label>
-                        <input type="text" id="namespace" name="namespace" value="{{ nacos.default_namespace }}">
-                        <span class="default-value">默认值: {{ nacos.default_namespace }}</span>
+                        <input type="text" id="namespace" name="namespace" value="server">
+                        <span class="default-value">默认值: server</span>
+                    </div>
+                    <div class="form-group optional">
+                        <label for="group">组:</label>
+                        <input type="text" id="group" name="group" value="v1.0.0">
+                        <span class="default-value">默认值: v1.0.0</span>
                     </div>
                     <div class="form-group optional">
                         <label for="username">用户名:</label>

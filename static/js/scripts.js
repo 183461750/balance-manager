@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const nacosForm = document.getElementById('nacosForm');
     if (nacosForm) {
         nacosForm.addEventListener('submit', function(e) {
+            console.log('Nacos配置表单提交事件触发');
             e.preventDefault();
             saveNacosConfig();
         });
@@ -164,6 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 保存Nacos配置到服务器
 async function saveNacosConfig() {
+    console.log('saveNacosConfig函数被调用，开始处理Nacos配置保存');
     // 获取输入框元素并验证 - 双重检查ID和name属性
     const serverInput = document.getElementById('server_addresses') || document.querySelector('input[name="server_addresses"]');
     const namespaceInput = document.getElementById('namespace') || document.querySelector('input[name="namespace"]');
@@ -240,12 +242,61 @@ async function saveNacosConfig() {
 
         if (data.success) {
             ToastManager.show('配置保存成功');
-            // 保存成功后更新本地配置缓存
-            ConfigManager.saveConfig('nacos', {
+            // 初始化Nacos客户端
+            console.log('开始调用/set_nacos_config接口');
+            const requestData = new URLSearchParams({
                 server_addresses: server_addresses,
                 namespace: namespace,
-                username: username
+                username: username,
+                password: password
             });
+            console.log('调用/set_nacos_config接口，参数:', requestData.toString());
+            fetch('/set_nacos_config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({
+                    server_addresses: server_addresses,
+                    namespace: namespace,
+                    username: username,
+                    password: password
+                })
+            }).then(response => {
+                console.log('/set_nacos_config响应状态:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                return response.json();
+            }).catch(error => {
+                console.error('调用/set_nacos_config接口失败:', error);
+                ToastManager.show('初始化Nacos客户端时出错: ' + error.message, 'error');
+            })
+            .then(data => {
+                if (data.success) {
+                    ToastManager.show('Nacos客户端初始化成功');
+                    updateGatewayUrl();
+                } else {
+                    ToastManager.show('Nacos客户端初始化失败: ' + data.message, 'error');
+                }
+            }).catch(error => {
+                ToastManager.show('初始化Nacos客户端时出错: ' + error.message, 'error');
+            });
+            // 保存成功后更新本地配置缓存
+        ConfigManager.saveConfig('nacos', {
+            server_addresses: server_addresses,
+            namespace: namespace,
+            username: username
+        });
+        // 保存到localStorage供后续请求使用
+        localStorage.setItem('nacosServerAddress', server_addresses);
+        localStorage.setItem('nacosNamespace', namespace);
+            // 关闭模态框
+            closeConfigModal();
+            // 更新Nacos IP回显
+            document.getElementById('currentDomain').textContent = server_addresses;
+            // 更新按钮显示的IP地址
+            document.getElementById('configStatus').textContent = server_addresses;
+            // 获取并更新域名
+            updateGatewayUrl();
         } else {
             ToastManager.show(data.message || '保存失败', 'error');
         }
@@ -349,6 +400,38 @@ function getEnvBadgeColor(env) {
     return colors[env] || 'secondary';
 }
 
+// 获取并更新网关地址
+async function updateGatewayUrl() {
+    try {
+        // 从本地存储获取Nacos连接信息
+        const serverAddress = localStorage.getItem('nacosServerAddress');
+        const namespace = localStorage.getItem('nacosNamespace');
+        
+        // 构建带参数的请求URL
+        const url = `/get_gateway_url?server_address=${encodeURIComponent(serverAddress)}&namespace=${encodeURIComponent(namespace)}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        const domainElement = document.getElementById('currentDomain');
+        
+        if (data.success && data.gateway_url) {
+            // 显示域名和IP地址
+            domainElement.textContent = data.gateway_url;
+            // 添加Tooltip显示完整信息
+            domainElement.title = `IP地址: ${serverAddress}\n域名: ${data.gateway_url}`;
+        } else {
+            domainElement.textContent = '未获取到网关配置';
+            domainElement.title = `IP地址: ${serverAddress}\n未获取到网关配置`;
+        }
+    } catch (error) {
+        console.error('获取网关地址失败:', error);
+        const domainElement = document.getElementById('currentDomain');
+        const serverAddress = localStorage.getItem('nacosServerAddress') || '未知IP';
+        domainElement.textContent = '获取网关失败';
+        domainElement.title = `IP地址: ${serverAddress}\n获取网关失败: ${error.message}`;
+    }
+}
+
 // 在设置Nacos配置后更新网关地址
 function setNacosConfig(event) {
     event.preventDefault();
@@ -434,7 +517,30 @@ async function queryBalance() {
     }
     
     try {
-        const response = await fetch(`/query_balance?phone=${encodeURIComponent(phone)}`);
+        // 构建查询URL，支持Nacos配置
+        let url = `/get_balance?phone=${encodeURIComponent(phone)}`;
+        
+        // 检查是否有Nacos配置
+        const config = ConfigManager.loadConfig();
+        if (config.type === 'nacos' && config.data) {
+            const nacosConfig = config.data;
+            if (nacosConfig.server_addresses) {
+                url += `&server_address=${encodeURIComponent(nacosConfig.server_addresses)}`;
+            }
+            if (nacosConfig.namespace) {
+                url += `&namespace=${encodeURIComponent(nacosConfig.namespace)}`;
+            }
+            if (nacosConfig.username) {
+                url += `&username=${encodeURIComponent(nacosConfig.username)}`;
+            }
+            if (nacosConfig.password) {
+                url += `&password=${encodeURIComponent(nacosConfig.password)}`;
+            }
+        }
+        
+        const response = await fetch(url, {
+            method: 'GET'
+        });
         const data = await response.json();
         
         const resultDiv = document.getElementById('result');
@@ -445,7 +551,8 @@ async function queryBalance() {
             resultDiv.innerHTML = `
                 <h3>查询结果</h3>
                 <p>手机号: ${phone}</p>
-                <p>当前余额: ${data.balance}</p>
+                <p>当前余额: ${data.data.balance}</p>
+                <p>环境: ${data.data.environment}</p>
             `;
         } else {
             resultDiv.className = 'result error fade-enter';

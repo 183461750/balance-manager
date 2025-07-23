@@ -1,14 +1,14 @@
 [
   {
     "server_addresses": "10.0.1.79",
-    "namespace": "",
+    "namespace": "server",
     "username": "",
     "password": ""
   },
   {
     "server_addresses": "10.0.1.90",
     "namespace": "server",
-    "username": "nacos",
+    "username": "",
     "password": ""
   }
 ]

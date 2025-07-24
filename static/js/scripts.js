@@ -386,7 +386,7 @@ async function loadNacosConfigs() {
         // 按更新时间排序（最新的在前）
         configs.sort((a, b) => new Date(b.last_modified_time || 0) - new Date(a.last_modified_time || 0));
 
-        // 填充下拉选项
+        // 填充下拉选项（移除标题，直接显示配置项）
         configs.forEach(config => {
             const address = config.server_addresses || '';
             if (!address) return; // 跳过无效地址
@@ -395,8 +395,8 @@ async function loadNacosConfigs() {
             item.className = 'dropdown-item d-flex justify-content-between align-items-center';
             item.innerHTML = `
                 <div>
-                    <strong>${config.data_id || config.name || '未命名配置'}</strong>
-                    <div class="text-sm text-muted">${address}</div>
+                    <strong>${config.data_id || config.name || address}</strong>
+                    <div class="text-sm text-muted">${config.namespace || '默认命名空间'}</div>
                 </div>
                 <span class="badge ${getEnvBadgeColor(config.env)}">${config.env || '默认'}</span>
             `;

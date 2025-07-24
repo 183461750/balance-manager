@@ -255,7 +255,7 @@ config = load_config()
 @app.route('/get_nacos_configs')
 def get_nacos_configs():
     """获取所有保存的Nacos配置"""
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'nacos_configs.json')
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nacos-data', 'nacos_configs.json')
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             configs = json.load(f)
@@ -279,7 +279,7 @@ def save_nacos_config():
         if field not in config_data:
             return jsonify({'error': f'缺少必要字段: {field}'}), 400
 
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'nacos_configs.json')
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nacos-data', 'nacos_configs.json')
     try:
         # 读取现有配置
         if os.path.exists(config_path):

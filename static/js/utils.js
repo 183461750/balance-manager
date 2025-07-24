@@ -41,7 +41,6 @@ const ConfigManager = {
                     this.saveConfig(config.type, config.data);
                 }
                 this.updateUI(config);
-                updateGatewayUrl();
                 return config;
             } catch (e) { console.error('加载配置失败:', e); }
         }
@@ -189,23 +188,44 @@ function formatDate(dateString) {
     return new Date(dateString).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 function updateGatewayUrl() {
-    const cachedDomain = DomainManager.getFromCache();
-    if (cachedDomain) DomainManager.updateDomainDisplay(cachedDomain);
-    DomainManager.updateDomainDisplay(null, true);
-    fetch('/get_gateway_url')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.gateway_url) {
-                DomainManager.updateDomainDisplay(data.gateway_url);
-                DomainManager.saveToCache(data.gateway_url);
-            } else {
+    try {
+        // 从ConfigManager获取Nacos配置
+        const config = ConfigManager.loadConfig();
+        if (!config || config.type !== 'nacos' || !config.data) {
+            DomainManager.updateDomainDisplay(null);
+            return;
+        }
+        
+        const serverAddress = config.data.server_addresses;
+        const namespace = config.data.namespace;
+        
+        if (!serverAddress || !namespace) {
+            DomainManager.updateDomainDisplay(null);
+            return;
+        }
+        
+        // 构建带参数的请求URL
+        const url = `/get_gateway_url?server_address=${encodeURIComponent(serverAddress)}&namespace=${encodeURIComponent(namespace)}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.gateway_url) {
+                    DomainManager.updateDomainDisplay(data.gateway_url);
+                    DomainManager.saveToCache(data.gateway_url);
+                } else {
+                    const fallback = DomainManager.getFromCache();
+                    DomainManager.updateDomainDisplay(fallback || null);
+                }
+            })
+            .catch(error => {
+                console.error('获取网关地址失败:', error);
                 const fallback = DomainManager.getFromCache();
                 DomainManager.updateDomainDisplay(fallback || null);
-            }
-        })
-        .catch(error => {
-            console.error('获取网关地址失败:', error);
-            const fallback = DomainManager.getFromCache();
-            DomainManager.updateDomainDisplay(fallback || null);
-        });
+            });
+    } catch (error) {
+        console.error('更新网关地址失败:', error);
+        const fallback = DomainManager.getFromCache();
+        DomainManager.updateDomainDisplay(fallback || null);
+    }
 }

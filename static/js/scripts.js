@@ -1,3 +1,25 @@
+// 获取Nacos配置参数
+function getNacosParams() {
+    const config = ConfigManager.loadConfig();
+    if (config.type === 'nacos' && config.data) {
+        const params = new URLSearchParams();
+        if (config.data.server_addresses) {
+            params.append('server_address', config.data.server_addresses);
+        }
+        if (config.data.namespace) {
+            params.append('namespace', config.data.namespace);
+        }
+        if (config.data.username) {
+            params.append('username', config.data.username);
+        }
+        if (config.data.password) {
+            params.append('password', config.data.password);
+        }
+        return params.toString();
+    }
+    return '';
+}
+
 // 表单提交处理
 const balanceForm = document.getElementById('balanceForm');
 if (balanceForm) {
@@ -7,7 +29,10 @@ if (balanceForm) {
         const resultDiv = document.getElementById('result');
         
         try {
-            const response = await fetch('/update_balance', {
+            const nacosParams = getNacosParams();
+            const url = '/update_balance' + (nacosParams ? '?' + nacosParams : '');
+            
+            const response = await fetch(url, {
                 method: 'POST',
                 body: formData
             });
@@ -16,18 +41,10 @@ if (balanceForm) {
             resultDiv.style.display = 'block';
             if (data.success) {
                 resultDiv.className = 'result success fade-enter';
-                const config = ConfigManager.loadConfig();
-                let configInfo = '';
-                if (config.type === 'nacos') {
-                    configInfo = `<p>配置方式: Nacos配置 (${config.data.server_addresses})</p>`;
-                } else {
-                    configInfo = `<p>环境: ${data.data.environment}</p>`;
-                }
-                
                 resultDiv.innerHTML = `
                     <h3>修改成功</h3>
-                    ${configInfo}
                     <p>新余额: ${data.data.balance}</p>
+                    <p>服务器: ${data.data.server_info}</p>
                 `;
                 // 更新余额后主动更新网关地址
                 updateGatewayUrl();
@@ -57,7 +74,10 @@ async function verifyPassword() {
     formData.append('password', password);
     
     try {
-        const response = await fetch('/verify_password', {
+        const nacosParams = getNacosParams();
+        const url = '/verify_password' + (nacosParams ? '?' + nacosParams : '');
+        
+        const response = await fetch(url, {
             method: 'POST',
             body: formData
         });
@@ -87,7 +107,10 @@ async function updatePassword() {
     formData.append('new_password', password);
     
     try {
-        const response = await fetch('/update_password', {
+        const nacosParams = getNacosParams();
+        const url = '/update_password' + (nacosParams ? '?' + nacosParams : '');
+        
+        const response = await fetch(url, {
             method: 'POST',
             body: formData
         });
@@ -117,6 +140,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     ToastManager.init();
+    BootstrapComponentManager.initAll();
+    
+    // 初始化Nacos配置下拉组件
+    loadNacosConfigs();
+
+    // 为输入框添加事件监听
+    const serverInput = document.getElementById('server_addresses');
+    if (serverInput) {
+        serverInput.addEventListener('focus', loadNacosConfigs);
+    }
+
+    // 添加Nacos表单提交处理 - 本地存储配置
+    const nacosForm = document.getElementById('nacosForm');
+    if (nacosForm) {
+        nacosForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const serverInput = document.getElementById('server_addresses') || document.querySelector('input[name="server_addresses"]');
+            const namespaceInput = document.getElementById('namespace') || document.querySelector('input[name="namespace"]');
+            const usernameInput = document.getElementById('username') || document.querySelector('input[name="username"]');
+            const passwordInput = document.getElementById('password') || document.querySelector('input[name="password"]');
+
+            if (serverInput && namespaceInput && usernameInput && passwordInput) {
+                const config = {
+                    server_addresses: serverInput.value.trim(),
+                    namespace: namespaceInput.value.trim(),
+                    username: usernameInput.value.trim(),
+                    password: passwordInput.value.trim()
+                };
+                
+                // 保存到本地存储
+                ConfigManager.saveConfig('nacos', config);
+                localStorage.setItem('nacosServerAddress', config.server_addresses);
+                localStorage.setItem('nacosNamespace', config.namespace);
+                
+                // 更新UI
+                document.getElementById('configBadge').className = 'config-badge nacos';
+                document.getElementById('configStatus').textContent = 'Nacos配置';
+                
+                // 更新网关地址
+                updateGatewayUrl();
+                closeConfigModal();
+                ToastManager.show('配置保存成功', 'success');
+            }
+        });
+    }
+    
+    // 页面加载完成后更新网关地址
+    setTimeout(() => {
+        updateGatewayUrl();
+    }, 100);
 });
 
 // 点击模态框外部关闭
@@ -126,42 +200,6 @@ window.onclick = function(event) {
         closeConfigModal();
     }
 };
-
-// 页面加载时初始化组件管理器
-document.addEventListener('DOMContentLoaded', function() {
-    // 初始化Nacos配置下拉组件
-    loadNacosConfigs();
-
-    // 为输入框添加事件监听
-    const serverInput = document.getElementById('server_addresses');
-    // 调试日志：检查输入值
-    console.log('保存前输入值:', serverInput.value);
-    // 调试日志：检查输入值
-    console.log('保存前输入值:', serverInput.value);
-    if (serverInput) {
-        serverInput.addEventListener('focus', loadNacosConfigs);
-    }
-
-
-    // 添加Nacos表单提交处理
-    const nacosForm = document.getElementById('nacosForm');
-    if (nacosForm) {
-        nacosForm.addEventListener('submit', function(e) {
-            console.log('Nacos配置表单提交事件触发');
-            e.preventDefault();
-            saveNacosConfig();
-        });
-        console.log('Nacos表单提交事件已绑定');
-    } else {
-        console.log('未找到Nacos表单元素');
-    }
-
-    updateGatewayUrl();
-    BootstrapComponentManager.initAll();
-
-    // 为动态内容添加手动初始化接口
-    window.initBootstrapDropdowns = () => BootstrapComponentManager.initDropdowns();
-});
 
 // 保存Nacos配置到服务器
 async function saveNacosConfig() {
@@ -242,44 +280,8 @@ async function saveNacosConfig() {
 
         if (data.success) {
             ToastManager.show('配置保存成功');
-            // 初始化Nacos客户端
-            console.log('开始调用/set_nacos_config接口');
-            const requestData = new URLSearchParams({
-                server_addresses: server_addresses,
-                namespace: namespace,
-                username: username,
-                password: password
-            });
-            console.log('调用/set_nacos_config接口，参数:', requestData.toString());
-            fetch('/set_nacos_config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({
-                    server_addresses: server_addresses,
-                    namespace: namespace,
-                    username: username,
-                    password: password
-                })
-            }).then(response => {
-                console.log('/set_nacos_config响应状态:', response.status);
-                if (!response.ok) {
-                    throw new Error(`HTTP错误: ${response.status}`);
-                }
-                return response.json();
-            }).catch(error => {
-                console.error('调用/set_nacos_config接口失败:', error);
-                ToastManager.show('初始化Nacos客户端时出错: ' + error.message, 'error');
-            })
-            .then(data => {
-                if (data.success) {
-                    ToastManager.show('Nacos客户端初始化成功');
-                    updateGatewayUrl();
-                } else {
-                    ToastManager.show('Nacos客户端初始化失败: ' + data.message, 'error');
-                }
-            }).catch(error => {
-                ToastManager.show('初始化Nacos客户端时出错: ' + error.message, 'error');
-            });
+            // 更新网关地址
+            updateGatewayUrl();
             // 保存成功后更新本地配置缓存
         ConfigManager.saveConfig('nacos', {
             server_addresses: server_addresses,
@@ -403,9 +405,20 @@ function getEnvBadgeColor(env) {
 // 获取并更新网关地址
 async function updateGatewayUrl() {
     try {
-        // 从本地存储获取Nacos连接信息
-        const serverAddress = localStorage.getItem('nacosServerAddress');
-        const namespace = localStorage.getItem('nacosNamespace');
+        // 从ConfigManager获取Nacos配置
+        const config = ConfigManager.loadConfig();
+        if (!config || config.type !== 'nacos' || !config.data) {
+            document.getElementById('currentDomain').textContent = '未配置Nacos';
+            return;
+        }
+        
+        const serverAddress = config.data.server_addresses;
+        const namespace = config.data.namespace;
+        
+        if (!serverAddress || !namespace) {
+            document.getElementById('currentDomain').textContent = 'Nacos配置不完整';
+            return;
+        }
         
         // 构建带参数的请求URL
         const url = `/get_gateway_url?server_address=${encodeURIComponent(serverAddress)}&namespace=${encodeURIComponent(namespace)}`;
@@ -426,36 +439,12 @@ async function updateGatewayUrl() {
     } catch (error) {
         console.error('获取网关地址失败:', error);
         const domainElement = document.getElementById('currentDomain');
-        const serverAddress = localStorage.getItem('nacosServerAddress') || '未知IP';
         domainElement.textContent = '获取网关失败';
-        domainElement.title = `IP地址: ${serverAddress}\n获取网关失败: ${error.message}`;
+        domainElement.title = `获取网关失败: ${error.message}`;
     }
 }
 
-// 在设置Nacos配置后更新网关地址
-function setNacosConfig(event) {
-    event.preventDefault();
-    const formData = new FormData(document.getElementById('nacosForm'));
-    
-    fetch('/set_nacos_config', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            updateGatewayUrl();  // 更新网关地址
-            document.getElementById('configBadge').className = 'config-badge nacos';
-            document.getElementById('configStatus').textContent = 'Nacos配置';
-            closeConfigModal();
-        }
-        showResult(data.message, data.success);
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showResult('设置失败: ' + error, false);
-    });
-}
+
 
 // 添加高级选项切换功能
 function toggleAdvancedOptions() {

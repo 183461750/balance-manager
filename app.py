@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 import json
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -10,8 +10,6 @@ import nacos
 import yaml
 
 app = Flask(__name__)
-app.secret_key = 'dev'  # 用于会话管理的密钥，生产环境应使用更安全的随机密钥
-app.secret_key = os.urandom(24)  # 用于session加密
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -25,39 +23,7 @@ nacos_config_cache = {}
 # 当前活跃的Nacos客户端
 active_nacos_clients = {}
 
-# 环境配置
-ENVIRONMENTS = {
-    'dev': {
-        'name': '开发环境',
-        'config': {
-            'host': os.getenv('DEV_DB_HOST', 'localhost'),
-            'user': os.getenv('DEV_DB_USER', 'postgres'),
-            'password': os.getenv('DEV_DB_PASSWORD', ''),
-            'dbname': os.getenv('DEV_DB_NAME', 'postgres'),
-            'port': int(os.getenv('DEV_DB_PORT', '5432'))
-        }
-    },
-    'test': {
-        'name': '测试环境',
-        'config': {
-            'host': os.getenv('TEST_DB_HOST', 'localhost'),
-            'user': os.getenv('TEST_DB_USER', 'postgres'),
-            'password': os.getenv('TEST_DB_PASSWORD', ''),
-            'dbname': os.getenv('TEST_DB_NAME', 'postgres'),
-            'port': int(os.getenv('TEST_DB_PORT', '5432'))
-        }
-    },
-    'prod': {
-        'name': '生产环境',
-        'config': {
-            'host': os.getenv('PROD_DB_HOST', 'localhost'),
-            'user': os.getenv('PROD_DB_USER', 'postgres'),
-            'password': os.getenv('PROD_DB_PASSWORD', ''),
-            'dbname': os.getenv('PROD_DB_NAME', 'postgres'),
-            'port': int(os.getenv('PROD_DB_PORT', '5432'))
-        }
-    }
-}
+
 
 def init_nacos_client(server_addresses, namespace, username=None, password=None):
     logger.info(f"get_nacos_config - server_addresses: {server_addresses}, namespace: {namespace}")
@@ -217,57 +183,7 @@ def get_gateway_url():
         }), 500
 
 
-def get_db_config():
-    """获取当前环境的数据库配置"""
-    config_type = session.get('config_type', 'nacos')  # 默认使用nacos配置
-    
-    if config_type == 'nacos':
-        server_address = session.get('nacos_server_address')
-        namespace = session.get('nacos_namespace')
-        if not server_address or not namespace:
-            logger.error("Nacos配置参数缺失")
-            return None
-        nacos_config = get_nacos_config(server_address, namespace)
-        if nacos_config and 'db_config' in nacos_config:
-            return nacos_config['db_config']
-        logger.warning("无法获取Nacos配置，将使用本地配置")
-    
-    # 使用本地配置
-    env = session.get('current_env', 'dev')
-    config = ENVIRONMENTS[env]['config']
-    # 记录当前使用的配置（不包含密码）
-    safe_config = config.copy()
-    safe_config['password'] = '******'
-    logger.info(f"当前使用的数据库配置: {safe_config}")
-    return config
 
-def get_db_connection():
-    """获取数据库连接"""
-    config = get_db_config()
-    try:
-        logger.info(f"尝试连接数据库: {config['host']}:{config['port']}/{config['dbname']}")
-        return psycopg2.connect(
-            cursor_factory=DictCursor,
-            connect_timeout=3,  # 设置连接超时时间
-            **config
-        )
-    except psycopg2.OperationalError as e:
-        logger.error(f"数据库连接失败: {str(e)}")
-        error_message = str(e)
-        if "No such file or directory" in error_message:
-            raise Exception(
-                "无法连接到数据库服务器。请检查：\n"
-                "1. PostgreSQL服务是否已启动\n"
-                "2. 数据库主机和端口配置是否正确\n"
-                "3. 防火墙是否允许连接\n"
-                f"当前配置: 主机={config['host']}, 端口={config['port']}"
-            )
-        elif "password authentication failed" in error_message:
-            raise Exception("数据库认证失败，请检查用户名和密码配置")
-        elif "database" in error_message and "does not exist" in error_message:
-            raise Exception(f"数据库 {config['dbname']} 不存在")
-        else:
-            raise Exception(f"连接数据库时出错: {error_message}")
 
 def get_db_connection_with_config(config):
     """根据提供的配置获取数据库连接"""
@@ -400,21 +316,7 @@ def index():
                              'default_namespace': 'server'
                          }))
 
-@app.route('/set_environment', methods=['POST'])
-def set_environment():
-    env = request.form.get('environment')
-    if env in ENVIRONMENTS:
-        session['current_env'] = env
-        session['config_type'] = 'env'
-        return jsonify({
-            'success': True,
-            'message': f'已切换到{ENVIRONMENTS[env]["name"]}',
-            'environment': env
-        })
-    return jsonify({
-        'success': False,
-        'message': '无效的环境选择'
-    })
+
 
 @app.route('/get_balance')
 def get_balance():
@@ -464,9 +366,7 @@ def get_balance():
                     'message': '无法从Nacos获取数据库配置',
                     'details': '请检查common.yml是否包含正确的PostgreSQL配置'
                 })
-        else:
-            # 使用当前配置
-            conn = get_db_connection()
+
         
         try:
             with conn.cursor() as cursor:
@@ -483,11 +383,7 @@ def get_balance():
                     return jsonify({'success': False, 'message': '未找到用户余额信息'})
                 
                 # 确定环境名称
-                if server_address:
-                    env_name = f"Nacos({server_address})"
-                else:
-                    current_env = session.get('current_env', 'dev')
-                    env_name = ENVIRONMENTS[current_env]['name']
+                env_name = f"Nacos({server_address})" if server_address else "本地配置"
                 
                 return jsonify({
                     'success': True,
@@ -510,8 +406,55 @@ def update_balance():
         phone = request.form['phone']
         new_balance = float(request.form['balance'])
         balance_encrypt = calculate_md5(new_balance)
-
-        conn = get_db_connection()
+        
+        # 从URL参数获取Nacos配置
+        server_address = request.args.get('server_address')
+        namespace = request.args.get('namespace')
+        username = request.args.get('username', 'nacos')
+        password = request.args.get('password', 'nacos')
+        
+        if not server_address or not namespace:
+            return jsonify({'success': False, 'message': '缺少必要参数: server_address和namespace'}), 400
+            
+        # 处理服务器地址格式
+        if ':' not in server_address:
+            server_address_with_port = f'{server_address}:8848'
+        else:
+            server_address_with_port = server_address
+            
+        # 获取Nacos配置
+        client_key = f'{server_address_with_port}_{namespace}'
+        if client_key not in active_nacos_clients:
+            init_success = init_nacos_client(
+                server_addresses=server_address_with_port,
+                namespace=namespace,
+                username=username,
+                password=password
+            )
+            if not init_success:
+                return jsonify({
+                    'success': False,
+                    'message': f'Nacos客户端初始化失败: {client_key}',
+                    'details': '请检查Nacos服务器地址、命名空间及凭据是否正确'
+                }), 500
+                
+        nacos_config = get_nacos_config(server_address_with_port, namespace)
+        if not nacos_config:
+            return jsonify({
+                'success': False,
+                'message': '未找到Nacos配置',
+                'details': f'配置路径: common.yml, 命名空间: {namespace}'
+            }), 404
+            
+        if 'db_config' not in nacos_config:
+            return jsonify({
+                'success': False,
+                'message': '配置中缺少数据库配置',
+                'details': '请检查common.yml是否包含正确的PostgreSQL配置'
+            }), 404
+            
+        # 使用配置获取数据库连接
+        conn = get_db_connection_with_config(nacos_config)
         try:
             with conn.cursor() as cursor:
                 # 先查询用户ID
@@ -531,16 +474,13 @@ def update_balance():
                 cursor.execute(sql_update, (new_balance, balance_encrypt, member[0]))
                 conn.commit()
                 
-                current_env = session.get('current_env', 'dev')
-                env_name = ENVIRONMENTS[current_env]['name']
-                
                 return jsonify({
                     'success': True, 
-                    'message': f'余额更新成功 ({env_name})',
+                    'message': '余额更新成功',
                     'data': {
                         'balance': new_balance,
                         'encrypt': balance_encrypt,
-                        'environment': env_name
+                        'server_info': f'{server_address_with_port} (namespace: {namespace})'
                     }
                 })
         finally:
@@ -550,104 +490,69 @@ def update_balance():
         logger.error(f"更新余额失败: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/set_nacos_config', methods=['POST'])
-def set_nacos_config():
-    logger.info("接收到set_nacos_config接口请求")
-    server_addresses = request.form.get('server_addresses')
-    namespace = request.form.get('namespace')
-    username = request.form.get('username')
-    logger.info(f"set_nacos_config接口参数 - server_addresses: {server_addresses}, namespace: {namespace}, username: {username}")
-    try:
-        server_addresses = request.form.get('server_addresses', '').strip()
-        # 添加默认端口8848（如果未指定）
-        if not server_addresses:
-            server_addresses = 'localhost:8848'
-        elif ':' not in server_addresses:
-            server_addresses += ':8848'
-        logger.info(f"规范化后的server_addresses: {server_addresses}")
-        namespace = request.form.get('namespace', '').strip() or ''
-        username = request.form.get('username', '').strip() or 'nacos'
-        password = request.form.get('password', '').strip() or 'nacos'
-        
-        if not server_addresses:
-            return jsonify({
-                'success': False,
-                'message': 'Nacos服务器地址不能为空'
-            })
-            
-        # 初始化Nacos客户端
-        logger.info(f"准备初始化Nacos客户端 - server_addresses: {server_addresses}, namespace: {namespace}, username: {username}")
-        if init_nacos_client(server_addresses, namespace, username, password):
-            logger.info(f"Nacos客户端初始化成功，准备存储连接信息到session")
-            # 存储Nacos连接信息到session
-            session['nacos_server_address'] = server_addresses
-            session['nacos_namespace'] = namespace
-            
-            # 测试获取配置
-            logger.info(f"开始获取Nacos配置 - server_addresses: {server_addresses}, namespace: {namespace}")
-            config = get_nacos_config(server_addresses, namespace)
-            if config:
-                session['config_type'] = 'nacos'
-                return jsonify({
-                    'success': True,
-                    'message': 'Nacos配置成功，已切换到Nacos配置模式',
-                    'config': {k: v if k != 'password' else '******' for k, v in config.items()}
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': '无法从Nacos获取PostgreSQL配置，请检查common.yml是否存在且包含正确的配置'
-                })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'Nacos客户端初始化失败'
-            })
-            
-    except Exception as e:
-        logger.error(f"设置Nacos配置失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f'设置Nacos配置时出错: {str(e)}'
-        })
 
-@app.route('/disable_nacos', methods=['POST'])
-def disable_nacos():
-    session['use_nacos'] = False
-    return jsonify({
-        'success': True,
-        'message': '已切换回本地配置模式'
-    })
+
+
 
 
 @app.route('/health')
 def health_check():
     """健康检查端点"""
     try:
-        # 检查数据库连接
-        config = get_db_config()
-        conn = get_db_connection()
-        conn.close()
+        # 从URL参数获取Nacos配置
+        server_address = request.args.get('server_address')
+        namespace = request.args.get('namespace')
+        username = request.args.get('username', 'nacos')
+        password = request.args.get('password', 'nacos')
         
-        # 检查Nacos连接（如果启用）
-        if session.get('config_type') == 'nacos' and nacos_client:
-            config_file = config.get('nacos', {}).get('config_file', 'common.yml')
-            config_group = config.get('nacos', {}).get('config_group', 'v1.0.0')
-            nacos_client.get_config(config_file, config_group)
+        if not server_address or not namespace:
+            return jsonify({
+                'status': 'error',
+                'message': '缺少必要参数: server_address和namespace'
+            }), 400
+            
+        # 处理服务器地址格式
+        if ':' not in server_address:
+            server_address_with_port = f'{server_address}:8848'
+        else:
+            server_address_with_port = server_address
+            
+        # 获取Nacos配置
+        client_key = f'{server_address_with_port}_{namespace}'
+        if client_key not in active_nacos_clients:
+            init_success = init_nacos_client(
+                server_addresses=server_address_with_port,
+                namespace=namespace,
+                username=username,
+                password=password
+            )
+            if not init_success:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Nacos客户端初始化失败: {client_key}'
+                }), 500
+                
+        nacos_config = get_nacos_config(server_address_with_port, namespace)
+        if not nacos_config or 'db_config' not in nacos_config:
+            return jsonify({
+                'status': 'error',
+                'message': '未找到有效的数据库配置'
+            }), 404
+            
+        # 检查数据库连接
+        conn = get_db_connection_with_config(nacos_config)
+        conn.close()
         
         return jsonify({
             'status': 'ok',
             'message': '服务运行正常',
-            'config_type': session.get('config_type', 'env'),
-            'environment': session.get('current_env', 'dev')
+            'server_info': f'{server_address_with_port} (namespace: {namespace})'
         })
     except Exception as e:
         logger.error(f"健康检查失败: {str(e)}")
         return jsonify({
             'status': 'error',
-            'message': str(e),
-            'config_type': session.get('config_type', 'env'),
-            'environment': session.get('current_env', 'dev')
+            'message': str(e)
         }), 500
 
 @app.route('/verify_password', methods=['POST'])
@@ -659,7 +564,54 @@ def verify_password():
         # 计算输入密码的MD5值
         password_md5 = calculate_password_md5(password)
         
-        conn = get_db_connection()
+        # 从URL参数获取Nacos配置
+        server_address = request.args.get('server_address')
+        namespace = request.args.get('namespace')
+        username = request.args.get('username', 'nacos')
+        password = request.args.get('password', 'nacos')
+        
+        if not server_address or not namespace:
+            return jsonify({'success': False, 'message': '缺少必要参数: server_address和namespace'}), 400
+            
+        # 处理服务器地址格式
+        if ':' not in server_address:
+            server_address_with_port = f'{server_address}:8848'
+        else:
+            server_address_with_port = server_address
+            
+        # 获取Nacos配置
+        client_key = f'{server_address_with_port}_{namespace}'
+        if client_key not in active_nacos_clients:
+            init_success = init_nacos_client(
+                server_addresses=server_address_with_port,
+                namespace=namespace,
+                username=username,
+                password=password
+            )
+            if not init_success:
+                return jsonify({
+                    'success': False,
+                    'message': f'Nacos客户端初始化失败: {client_key}',
+                    'details': '请检查Nacos服务器地址、命名空间及凭据是否正确'
+                }), 500
+                
+        nacos_config = get_nacos_config(server_address_with_port, namespace)
+        if not nacos_config:
+            return jsonify({
+                'success': False,
+                'message': '未找到Nacos配置',
+                'details': f'配置路径: common.yml, 命名空间: {namespace}'
+            }), 404
+            
+        if 'db_config' not in nacos_config:
+            return jsonify({
+                'success': False,
+                'message': '配置中缺少数据库配置',
+                'details': '请检查common.yml是否包含正确的PostgreSQL配置'
+            }), 404
+            
+        # 使用配置获取数据库连接
+        conn = get_db_connection_with_config(nacos_config)
         try:
             with conn.cursor() as cursor:
                 # 查询用户密码
@@ -698,7 +650,54 @@ def update_password():
         # 计算新密码的MD5值
         new_password_md5 = calculate_password_md5(new_password)
         
-        conn = get_db_connection()
+        # 从URL参数获取Nacos配置
+        server_address = request.args.get('server_address')
+        namespace = request.args.get('namespace')
+        username = request.args.get('username', 'nacos')
+        password = request.args.get('password', 'nacos')
+        
+        if not server_address or not namespace:
+            return jsonify({'success': False, 'message': '缺少必要参数: server_address和namespace'}), 400
+            
+        # 处理服务器地址格式
+        if ':' not in server_address:
+            server_address_with_port = f'{server_address}:8848'
+        else:
+            server_address_with_port = server_address
+            
+        # 获取Nacos配置
+        client_key = f'{server_address_with_port}_{namespace}'
+        if client_key not in active_nacos_clients:
+            init_success = init_nacos_client(
+                server_addresses=server_address_with_port,
+                namespace=namespace,
+                username=username,
+                password=password
+            )
+            if not init_success:
+                return jsonify({
+                    'success': False,
+                    'message': f'Nacos客户端初始化失败: {client_key}',
+                    'details': '请检查Nacos服务器地址、命名空间及凭据是否正确'
+                }), 500
+                
+        nacos_config = get_nacos_config(server_address_with_port, namespace)
+        if not nacos_config:
+            return jsonify({
+                'success': False,
+                'message': '未找到Nacos配置',
+                'details': f'配置路径: common.yml, 命名空间: {namespace}'
+            }), 404
+            
+        if 'db_config' not in nacos_config:
+            return jsonify({
+                'success': False,
+                'message': '配置中缺少数据库配置',
+                'details': '请检查common.yml是否包含正确的PostgreSQL配置'
+            }), 404
+            
+        # 使用配置获取数据库连接
+        conn = get_db_connection_with_config(nacos_config)
         try:
             with conn.cursor() as cursor:
                 # 更新密码

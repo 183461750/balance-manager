@@ -52,9 +52,9 @@ const ConfigManager = {
         const status = document.getElementById('configStatus');
         badge.className = `config-badge ${config.type}`;
         if (config.type === 'nacos') {
-            status.textContent = `Nacos: ${config.data.server || ''}`;
-            if (config.data.server !== undefined) {
-                document.getElementById('server_addresses').value = config.data.server === '未连接' ? '' : config.data.server;
+            status.textContent = config.data.server_addresses || '';
+            if (config.data.server_addresses !== undefined) {
+                document.getElementById('server_addresses').value = config.data.server_addresses === '未连接' ? '' : config.data.server_addresses;
                 document.getElementById('namespace').value = config.data.namespace || '';
                 document.getElementById('username').value = config.data.username || '';
             }

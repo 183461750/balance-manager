@@ -1,63 +1,170 @@
 // 获取Nacos配置参数
 function getNacosParams() {
+    console.log('getNacosParams called');
     const config = ConfigManager.loadConfig();
     if (config.type === 'nacos' && config.data) {
         const params = new URLSearchParams();
-        if (config.data.server_addresses) {
-            params.append('server_address', config.data.server_addresses);
+        
+        // 确保必需参数存在
+        if (!config.data.server_addresses) {
+            console.error('缺少server_address配置');
+            return null;
         }
-        if (config.data.namespace) {
-            params.append('namespace', config.data.namespace);
+        if (!config.data.namespace) {
+            console.warn('缺少namespace配置，使用默认值: server');
+            config.data.namespace = 'server';
         }
-        if (config.data.username) {
-            params.append('username', config.data.username);
-        }
-        if (config.data.password) {
-            params.append('password', config.data.password);
-        }
+        
+        params.append('server_address', config.data.server_addresses);
+        params.append('namespace', config.data.namespace || 'server');
+        params.append('username', config.data.username || 'nacos');
+        params.append('password', config.data.password || 'nacos');
+        
         return params.toString();
     }
-    return '';
+    return null;
 }
 
-// 表单提交处理
-const balanceForm = document.getElementById('balanceForm');
-if (balanceForm) {
-    balanceForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const resultDiv = document.getElementById('result');
-        
+// 表单提交处理 - 移到DOMContentLoaded中确保DOM已加载
+function initBalanceForm() {
+    const debugStatus = document.getElementById('debugStatus');
+    debugStatus.textContent += 'initBalanceForm函数执行\n';
+    
+    // 查找表单元素
+    const balanceForm = document.getElementById('balanceForm');
+    if (balanceForm) {
+        debugStatus.textContent += '找到balanceForm元素\n';
+    } else {
+        debugStatus.textContent += '错误: 未找到balanceForm元素\n';
+    }
+    
+    // 查找查询按钮
+    const queryBalanceBtn = document.getElementById('queryBalanceBtn');
+    if (queryBalanceBtn) {
+        debugStatus.textContent += '找到queryBalanceBtn元素\n';
         try {
-            const nacosParams = getNacosParams();
-            const url = '/update_balance' + (nacosParams ? '?' + nacosParams : '');
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            
-            resultDiv.style.display = 'block';
-            if (data.success) {
-                resultDiv.className = 'result success fade-enter';
-                resultDiv.innerHTML = `
-                    <h3>修改成功</h3>
-                    <p>新余额: ${data.data.balance}</p>
-                    <p>服务器: ${data.data.server_info}</p>
-                `;
-                // 更新余额后主动更新网关地址
-                updateGatewayUrl();
-            } else {
-                resultDiv.className = 'result error fade-enter';
-                resultDiv.innerHTML = `<p>错误: ${data.message}</p>`;
-            }
+            queryBalanceBtn.addEventListener('click', function(e) {
+  e.preventDefault();
+  queryBalance();
+});
+            debugStatus.textContent += 'queryBalanceBtn点击事件绑定成功\n';
         } catch (error) {
-            resultDiv.style.display = 'block';
-            resultDiv.className = 'result error fade-enter';
-            resultDiv.innerHTML = `<p>系统错误: ${error.message}</p>`;
+            debugStatus.textContent += '绑定点击事件失败: ' + error.message + '\n';
         }
-    });
+    } else {
+        debugStatus.textContent += '错误: 未找到queryBalanceBtn元素\n';
+    }
+    
+    // 检查表单提交事件
+    if (balanceForm) {
+        debugStatus.textContent += '开始绑定表单提交事件\n';
+        try {
+            balanceForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                debugStatus.textContent += '表单提交事件触发，开始修改余额...\n';
+                
+                const phoneInput = document.getElementById('phone');
+                const balanceInput = document.getElementById('balance');
+                
+                if (!phoneInput || !balanceInput) {
+                    debugStatus.textContent += '错误: 找不到表单元素\n';
+                    ToastManager.show('表单配置错误，请联系管理员', 'error');
+                    return;
+                }
+                
+                const phone = phoneInput.value;
+                const balance = balanceInput.value;
+                
+                if (!phone || phone.length !== 11) {
+                    debugStatus.textContent += '错误: 无效手机号\n';
+                    ToastManager.show('请输入有效的手机号', 'error');
+                    return;
+                }
+                
+                if (!balance || isNaN(balance)) {
+                    debugStatus.textContent += '错误: 无效余额值\n';
+                    ToastManager.show('请输入有效的余额值', 'error');
+                    return;
+                }
+                
+                try {
+                    debugStatus.textContent += '开始构建更新URL...\n';
+                    
+                    // 获取Nacos配置
+                    const config = ConfigManager.loadConfig();
+                    let url = '/update_balance';
+                    
+                    if (config.type === 'nacos' && config.data) {
+                        const nacosConfig = config.data;
+                        if (nacosConfig.server_addresses) {
+                            url += `?server_address=${encodeURIComponent(nacosConfig.server_addresses)}`;
+                            debugStatus.textContent += `添加server_address参数: ${nacosConfig.server_addresses}\n`;
+                        }
+                        if (nacosConfig.namespace) {
+                            url += `${url.includes('?') ? '&' : '?'}namespace=${encodeURIComponent(nacosConfig.namespace)}`;
+                            debugStatus.textContent += `添加namespace参数: ${nacosConfig.namespace}\n`;
+                        }
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append('phone', phone);
+                    formData.append('balance', balance);
+                    
+                    debugStatus.textContent += `发起更新请求: ${url}\n`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    debugStatus.textContent += '更新请求成功，处理响应...\n';
+                    
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.style.display = 'block';
+                    
+                    if (data.success) {
+                        resultDiv.className = 'result success fade-enter';
+                        resultDiv.innerHTML = `
+                            <h3>修改成功</h3>
+                            <p>新余额: ${data.data.balance}</p>
+                            <p>服务器: ${data.data.server_info}</p>
+                        `;
+                        // 更新余额后主动更新网关地址
+                        updateGatewayUrl();
+                    } else {
+                        resultDiv.className = 'result error fade-enter';
+                        const errorMessage = data.message || '更新失败';
+                        const userFriendlyMessage = errorMessage.includes('conn') || errorMessage.includes('数据库') || errorMessage.includes('connection') ?
+                            '系统繁忙，请稍后重试或联系管理员' :
+                            errorMessage.includes('用户不存在') ?
+                            '未找到该用户的余额信息，请确认手机号是否正确' :
+                            errorMessage.includes('Nacos') ?
+                            '配置服务异常，请检查网络连接或联系管理员' :
+                            errorMessage;
+                        
+                        resultDiv.innerHTML = `<p>${userFriendlyMessage}</p>`;
+                    }
+                } catch (error) {
+                    debugStatus.textContent += `更新错误: ${error.message}\n`;
+                    const resultDiv = document.getElementById('result');
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'result error fade-enter';
+                    const userFriendlyMessage = error.message.includes('NetworkError') || error.message.includes('fetch') ?
+                        '网络连接异常，请检查网络设置' :
+                        '系统异常，请稍后重试';
+                    resultDiv.innerHTML = `<p>${userFriendlyMessage}</p>`;
+                }
+            });
+            debugStatus.textContent += '表单提交事件绑定成功\n';
+        } catch (error) {
+            debugStatus.textContent += '绑定表单提交事件失败: ' + error.message + '\n';
+        }
+    }
+
 }
 
 // 添加密码校验功能
@@ -69,13 +176,20 @@ async function verifyPassword() {
         return;
     }
     
+    // 检查是否已配置Nacos参数
+    const nacosParams = getNacosParams();
+    if (!nacosParams) {
+        ToastManager.show('请先配置Nacos服务器参数：服务器地址不能为空', 'error');
+        document.getElementById('configBtn').click();
+        return;
+    }
+    
     const formData = new FormData();
     formData.append('phone', phone);
     formData.append('password', password);
     
     try {
-        const nacosParams = getNacosParams();
-        const url = '/verify_password' + (nacosParams ? '?' + nacosParams : '');
+        const url = '/verify_password?' + nacosParams;
         
         const response = await fetch(url, {
             method: 'POST',
@@ -83,12 +197,38 @@ async function verifyPassword() {
         });
         const data = await response.json();
         
+        const resultDiv = document.getElementById('passwordResult');
+        resultDiv.style.display = 'block';
+        
         if (data.success) {
+            resultDiv.className = 'result success fade-enter';
+            resultDiv.innerHTML = `
+                <h3>密码验证结果</h3>
+                <p>手机号: ${phone}</p>
+                <p>验证状态: <span class="text-success">验证通过</span></p>
+                <p>密码正确</p>
+            `;
             ToastManager.show('密码验证通过', 'success');
         } else {
+            resultDiv.className = 'result error fade-enter';
+            resultDiv.innerHTML = `
+                <h3>密码验证结果</h3>
+                <p>手机号: ${phone}</p>
+                <p>验证状态: <span class="text-danger">验证失败</span></p>
+                <p>错误信息: ${data.message}</p>
+            `;
             ToastManager.show(data.message, 'error');
         }
     } catch (error) {
+        const resultDiv = document.getElementById('passwordResult');
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result error fade-enter';
+        resultDiv.innerHTML = `
+            <h3>密码验证结果</h3>
+            <p>手机号: ${phone}</p>
+            <p>验证状态: <span class="text-danger">系统错误</span></p>
+            <p>错误信息: ${error.message}</p>
+        `;
         ToastManager.show('系统错误: ' + error.message, 'error');
     }
 }
@@ -102,13 +242,20 @@ async function updatePassword() {
         return;
     }
     
+    // 检查是否已配置Nacos参数
+    const nacosParams = getNacosParams();
+    if (!nacosParams) {
+        ToastManager.show('请先配置Nacos服务器参数', 'error');
+        document.getElementById('configBtn').click();
+        return;
+    }
+    
     const formData = new FormData();
     formData.append('phone', phone);
     formData.append('new_password', password);
     
     try {
-        const nacosParams = getNacosParams();
-        const url = '/update_password' + (nacosParams ? '?' + nacosParams : '');
+        const url = '/update_password?' + nacosParams;
         
         const response = await fetch(url, {
             method: 'POST',
@@ -116,14 +263,40 @@ async function updatePassword() {
         });
         const data = await response.json();
         
+        const resultDiv = document.getElementById('passwordResult');
+        resultDiv.style.display = 'block';
+        
         if (data.success) {
+            resultDiv.className = 'result success fade-enter';
+            resultDiv.innerHTML = `
+                <h3>密码修改结果</h3>
+                <p>手机号: ${phone}</p>
+                <p>修改状态: <span class="text-success">修改成功</span></p>
+                <p>新密码已生效</p>
+            `;
             ToastManager.show('密码修改成功', 'success');
             // 清空密码输入框
             document.getElementById('password').value = '';
         } else {
+            resultDiv.className = 'result error fade-enter';
+            resultDiv.innerHTML = `
+                <h3>密码修改结果</h3>
+                <p>手机号: ${phone}</p>
+                <p>修改状态: <span class="text-danger">修改失败</span></p>
+                <p>错误信息: ${data.message}</p>
+            `;
             ToastManager.show(data.message, 'error');
         }
     } catch (error) {
+        const resultDiv = document.getElementById('passwordResult');
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result error fade-enter';
+        resultDiv.innerHTML = `
+            <h3>密码修改结果</h3>
+            <p>手机号: ${phone}</p>
+            <p>修改状态: <span class="text-danger">系统错误</span></p>
+            <p>错误信息: ${error.message}</p>
+        `;
         ToastManager.show('系统错误: ' + error.message, 'error');
     }
 }
@@ -131,12 +304,32 @@ async function updatePassword() {
 
 
 // 页面加载时初始化配置状态
-document.addEventListener('DOMContentLoaded', () => {
-    // 加载保存的配置
-    const config = ConfigManager.loadConfig();
-    if (!config) {
-        // 如果没有保存的配置，设置默认状态
-        ConfigManager.saveConfig('nacos', { server_addresses: '' });
+document.addEventListener('DOMContentLoaded', async function() {
+    const debugStatus = document.getElementById('debugStatus');
+    debugStatus.textContent += 'DOMContentLoaded事件触发\n';
+    let config;
+    try {
+        // 加载保存的配置
+        debugStatus.textContent += '开始加载配置...\n';
+        config = ConfigManager.loadConfig();
+        debugStatus.textContent += '配置加载成功\n';
+        // 检查配置类型并加载Nacos配置
+        if (config.type === 'nacos') {
+            debugStatus.textContent += '检测到Nacos配置，开始加载...\n';
+            try {
+                await loadNacosConfigs();
+                debugStatus.textContent += 'Nacos配置加载完成\n';
+            } catch (nacosError) {
+                debugStatus.textContent += 'Nacos配置加载失败: ' + nacosError.message + '\n';
+            }
+        }
+        // 无论Nacos配置是否成功，始终初始化表单
+        debugStatus.textContent += '准备调用initBalanceForm...\n';
+        initBalanceForm();
+        debugStatus.textContent += 'initBalanceForm调用完成\n';
+    } catch (error) {
+        debugStatus.textContent += '初始化错误: ' + error.message + '\n';
+        console.error('初始化失败:', error);
     }
     
     ToastManager.init();
@@ -213,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('configStatus').textContent = config.server_addresses;
                 
                 // 更新网关地址和域名显示
-                updateGatewayUrl();
+                updateGatewayUrl({type: 'nacos', data: config});
                 closeConfigModal();
                 ToastManager.show(isExisting ? '配置连接成功' : '配置保存并连接成功', 'success');
                 
@@ -226,10 +419,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 页面加载完成后更新网关地址
-    setTimeout(() => {
-        updateGatewayUrl();
-    }, 100);
+    // 初始加载网关地址
+    updateGatewayUrl(config);
+    
+    // 初始化余额表单
+    initBalanceForm();
+    
+    // 添加实时手机号验证
+    const phoneInput = document.getElementById('phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function() {
+            const phone = this.value.replace(/\D/g, '').trim();
+            const isValid = /^[0-9]{11}$/.test(phone);
+            
+            if (phone.length > 0 && phone.length <= 11) {
+                this.style.borderColor = isValid ? '#28a745' : '#ffc107';
+                this.style.boxShadow = isValid ? 
+                    '0 0 0 0.2rem rgba(40, 167, 69, 0.25)' : 
+                    '0 0 0 0.2rem rgba(255, 193, 7, 0.25)';
+            } else {
+                this.style.borderColor = '';
+                this.style.boxShadow = '';
+            }
+        });
+        
+        phoneInput.addEventListener('blur', function() {
+            const phone = this.value.replace(/\D/g, '').trim();
+            if (phone.length > 0 && phone.length !== 11) {
+                this.style.borderColor = '#dc3545';
+                this.style.boxShadow = '0 0 0 0.2rem rgba(220, 53, 69, 0.25)';
+            }
+        });
+    }
 });
 
 // 点击模态框外部关闭
@@ -442,10 +663,14 @@ function getEnvBadgeColor(env) {
 }
 
 // 获取并更新网关地址
-async function updateGatewayUrl() {
+async function updateGatewayUrl(configData = null) {
     try {
-        // 从ConfigManager获取Nacos配置
-        const config = ConfigManager.loadConfig();
+        // 使用传入的配置或从ConfigManager获取
+        let config = configData;
+        if (!config) {
+            config = ConfigManager.loadConfig();
+        }
+        
         if (!config || config.type !== 'nacos' || !config.data) {
             document.getElementById('currentDomain').textContent = '未配置Nacos';
             return;
@@ -524,6 +749,14 @@ function switchTab(tabId) {
     });
     
     document.querySelector(`.nav-tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+    
+    // 切换标签时隐藏密码结果区域
+    if (tabId !== 'password') {
+        const passwordResult = document.getElementById('passwordResult');
+        if (passwordResult) {
+            passwordResult.style.display = 'none';
+        }
+    }
 }
 
 // 打开配置模态框
@@ -538,56 +771,86 @@ function closeConfigModal() {
 
 // 查询余额
 async function queryBalance() {
-    const phone = document.getElementById('phone').value;
-    if (!phone || phone.length !== 11) {
-        ToastManager.show('请输入有效的手机号', 'error');
+    console.log('queryBalance called');
+    const debugStatus = document.getElementById('debugStatus');
+    debugStatus.textContent += 'queryBalance函数执行\n';
+    
+    const phoneInput = document.getElementById('phone');
+    debugStatus.textContent += `手机号输入框元素: ${phoneInput ? '已找到' : '未找到'}\n`;
+    const rawValue = phoneInput ? phoneInput.value : '无输入框';
+    debugStatus.textContent += `原始输入值: [${rawValue}]\n`;
+    const phone = phoneInput ? rawValue.replace(/\D/g, '').trim() : '';
+    debugStatus.textContent += `获取到的手机号: [${phone}] (长度: ${phone.length})\n`;
+    const isValid = /^[0-9]{11}$/.test(phone);
+    debugStatus.textContent += `手机号验证结果: ${isValid ? '有效' : '无效'}\n`;
+    if (!isValid) {
+        const message = phone.length === 0 ? 
+          '请输入11位手机号' : 
+          phone.length < 11 ? 
+          `手机号位数不足：当前${phone.length}位，需要11位` : 
+          phone.length > 11 ? 
+          `手机号位数过多：当前${phone.length}位，需要11位` : 
+          '手机号格式不正确，请输入11位数字';
+        
+        debugStatus.textContent += `错误: ${message}\n`;
+        ToastManager.show(message, 'error');
+        
+        // 高亮显示输入框
+        phoneInput.style.borderColor = '#dc3545';
+        phoneInput.style.boxShadow = '0 0 0 0.2rem rgba(220, 53, 69, 0.25)';
+        phoneInput.focus();
+        
+        // 3秒后恢复样式
+        setTimeout(() => {
+          phoneInput.style.borderColor = '';
+          phoneInput.style.boxShadow = '';
+        }, 3000);
+        
         return;
     }
     
     try {
-        // 构建查询URL，支持Nacos配置
+        debugStatus.textContent += '开始构建查询URL...\n';
         let url = `/get_balance?phone=${encodeURIComponent(phone)}`;
         
-        // 检查是否有Nacos配置
+        // 获取Nacos配置
         const config = ConfigManager.loadConfig();
         if (config.type === 'nacos' && config.data) {
             const nacosConfig = config.data;
             if (nacosConfig.server_addresses) {
                 url += `&server_address=${encodeURIComponent(nacosConfig.server_addresses)}`;
+                debugStatus.textContent += `添加server_address参数: ${nacosConfig.server_addresses}\n`;
             }
             if (nacosConfig.namespace) {
                 url += `&namespace=${encodeURIComponent(nacosConfig.namespace)}`;
-            }
-            if (nacosConfig.username) {
-                url += `&username=${encodeURIComponent(nacosConfig.username)}`;
-            }
-            if (nacosConfig.password) {
-                url += `&password=${encodeURIComponent(nacosConfig.password)}`;
+                debugStatus.textContent += `添加namespace参数: ${nacosConfig.namespace}\n`;
             }
         }
         
-        const response = await fetch(url, {
-            method: 'GET'
-        });
+        debugStatus.textContent += `发起请求: ${url}\n`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status}`);
+        }
         const data = await response.json();
+        debugStatus.textContent += '请求成功，处理响应...\n';
         
         const resultDiv = document.getElementById('result');
         resultDiv.style.display = 'block';
-        
         if (data.success) {
-            resultDiv.className = 'result success fade-enter';
-            resultDiv.innerHTML = `
-                <h3>查询结果</h3>
-                <p>手机号: ${phone}</p>
-                <p>当前余额: ${data.data.balance}</p>
-                <p>环境: ${data.data.environment}</p>
-            `;
+            resultDiv.textContent = `当前余额: ${data.data.balance}元`;
         } else {
-            resultDiv.className = 'result error fade-enter';
-            resultDiv.innerHTML = `<p>错误: ${data.message}</p>`;
+            resultDiv.textContent = `查询失败: ${data.message}`;
         }
     } catch (error) {
-        ToastManager.show('查询失败: ' + error.message, 'error');
+        debugStatus.textContent += `查询错误: ${error.message}\n`;
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'result error fade-enter';
+        const userFriendlyMessage = error.message.includes('NetworkError') || error.message.includes('fetch') ?
+            '网络连接异常，请检查网络设置' :
+            '系统异常，请稍后重试';
+        resultDiv.innerHTML = `<p>${userFriendlyMessage}</p>`;
     }
 }
 

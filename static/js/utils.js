@@ -29,22 +29,73 @@ const ConfigManager = {
         const config = { type, data, timestamp: new Date().getTime() };
         localStorage.setItem('dbConfig', JSON.stringify(config));
         this.updateUI(config);
-        updateGatewayUrl();
+        // 避免循环调用
+        if (typeof updateGatewayUrl === 'function') {
+            setTimeout(updateGatewayUrl, 0);
+        }
     },
     loadConfig: function() {
         const saved = localStorage.getItem('dbConfig');
         if (saved) {
             try {
                 const config = JSON.parse(saved);
+                let shouldSave = false;
+                
                 if (config.data?.server === '未连接') {
                     config.data.server = '';
-                    this.saveConfig(config.type, config.data);
+                    shouldSave = true;
                 }
+                
+                // 确保Nacos配置完整性
+                if (config.type === 'nacos' && config.data) {
+                    if (!config.data.namespace) {
+                        config.data.namespace = 'server';
+                        shouldSave = true;
+                    }
+                    if (!config.data.username) {
+                        config.data.username = 'nacos';
+                        shouldSave = true;
+                    }
+                    if (!config.data.password) {
+                        config.data.password = 'nacos';
+                        shouldSave = true;
+                    }
+                }
+                
                 this.updateUI(config);
+                
+                // 只在需要时保存一次，避免循环
+                if (shouldSave) {
+                    setTimeout(() => {
+                        localStorage.setItem('dbConfig', JSON.stringify(config));
+                    }, 0);
+                }
+                
                 return config;
-            } catch (e) { console.error('加载配置失败:', e); }
+            } catch (e) { 
+                console.error('加载配置失败:', e); 
+                // 配置损坏时返回默认配置
+                const defaultConfig = this.getDefaultConfig();
+                this.updateUI(defaultConfig);
+                return defaultConfig;
+            }
         }
-        return null;
+        const defaultConfig = this.getDefaultConfig();
+        this.updateUI(defaultConfig);
+        return defaultConfig;
+    },
+    
+    getDefaultConfig: function() {
+        return {
+            type: 'nacos',
+            data: {
+                server_addresses: '',
+                namespace: 'server',
+                username: 'nacos',
+                password: 'nacos'
+            },
+            timestamp: new Date().getTime()
+        };
     },
     updateUI: function(config) {
         if (!config) return;

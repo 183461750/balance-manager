@@ -151,10 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
         serverInput.addEventListener('focus', loadNacosConfigs);
     }
 
-    // 添加Nacos表单提交处理 - 本地存储配置
+    // 添加Nacos表单提交处理 - 检查并保存配置
     const nacosForm = document.getElementById('nacosForm');
     if (nacosForm) {
-        nacosForm.addEventListener('submit', function(e) {
+        nacosForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const serverInput = document.getElementById('server_addresses') || document.querySelector('input[name="server_addresses"]');
@@ -162,27 +162,66 @@ document.addEventListener('DOMContentLoaded', () => {
             const usernameInput = document.getElementById('username') || document.querySelector('input[name="username"]');
             const passwordInput = document.getElementById('password') || document.querySelector('input[name="password"]');
 
-            if (serverInput && namespaceInput && usernameInput && passwordInput) {
-                const config = {
-                    server_addresses: serverInput.value.trim(),
-                    namespace: namespaceInput.value.trim(),
-                    username: usernameInput.value.trim(),
-                    password: passwordInput.value.trim()
-                };
-                
+            if (!serverInput || !namespaceInput || !usernameInput || !passwordInput) {
+                ToastManager.show('配置表单元素不完整', 'error');
+                return;
+            }
+
+            const config = {
+                server_addresses: serverInput.value.trim(),
+                namespace: namespaceInput.value.trim(),
+                username: usernameInput.value.trim(),
+                password: passwordInput.value.trim()
+            };
+
+            if (!config.server_addresses) {
+                ToastManager.show('服务器地址不能为空', 'error');
+                return;
+            }
+
+            try {
+                // 检查当前输入的IP是否在下拉列表中
+                const existingConfigs = await fetch('/get_nacos_configs').then(r => r.json());
+                const isExisting = Array.isArray(existingConfigs) && 
+                                 existingConfigs.some(c => c.server_addresses === config.server_addresses);
+
+                // 如果IP不在列表中，则调用保存接口
+                if (!isExisting) {
+                    const saveResponse = await fetch('/save_nacos_config', {
+                        method: 'POST',
+                        body: JSON.stringify(config),
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'same-origin'
+                    });
+                    
+                    const saveData = await saveResponse.json();
+                    if (!saveData.success) {
+                        ToastManager.show(saveData.message || '保存配置失败', 'error');
+                        return;
+                    }
+                }
+
                 // 保存到本地存储
                 ConfigManager.saveConfig('nacos', config);
                 localStorage.setItem('nacosServerAddress', config.server_addresses);
                 localStorage.setItem('nacosNamespace', config.namespace);
                 
-                // 更新UI
+                // 更新UI显示实际IP
                 document.getElementById('configBadge').className = 'config-badge nacos';
-                document.getElementById('configStatus').textContent = 'Nacos配置';
+                document.getElementById('configStatus').textContent = config.server_addresses;
                 
-                // 更新网关地址
+                // 更新网关地址和域名显示
                 updateGatewayUrl();
                 closeConfigModal();
-                ToastManager.show('配置保存成功', 'success');
+                ToastManager.show(isExisting ? '配置连接成功' : '配置保存并连接成功', 'success');
+                
+                // 重新加载下拉列表
+                loadNacosConfigs();
+                
+            } catch (error) {
+                ToastManager.show('配置处理失败: ' + error.message, 'error');
             }
         });
     }

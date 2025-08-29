@@ -1,0 +1,23 @@
+
+services:
+
+  balance-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_NAME:-balance-manager}
+    ports:
+      - "${PORT:-8001}:8001"
+    environment:
+      TZ: "Asia/Shanghai"
+      FLASK_ENV: ${FLASK_ENV:-development}
+      FLASK_DEBUG: ${FLASK_DEBUG:-1}
+    volumes:
+      - ./nacos-data:/app/nacos-data
+    networks:
+      - balance-network
+    restart: on-failure
+
+networks:
+  balance-network:
+    driver: bridge 

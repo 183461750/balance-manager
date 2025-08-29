@@ -8,4 +8,5 @@ RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 EXPOSE 3000
 
-CMD ["python", "app.py"] 
+CMD ["python", "app.py"]
+# CMD ["tail", "-f", "/dev/null"]
